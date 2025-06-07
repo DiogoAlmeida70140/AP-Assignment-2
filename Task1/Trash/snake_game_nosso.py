@@ -71,7 +71,7 @@ class SnakeGame:
     def step(self, action):        
         """
         move snake/game one step 
-        action can be -1 (turn left), 0 (continue), 1 (turn rignt)
+        action can be -1 (turn left), 0 (continue), 1 (turn right)
         """
         direction = int(action)
         assert -1<=direction<=1        
@@ -81,26 +81,53 @@ class SnakeGame:
         elif self.direction>3:
             self.direction = 0
         self.grow_snake(self.direction)  # two steps: grow+remove last
-        if self.snake[0] in self.apples:            
+        if self.snake[0] in self.apples:
             self.apples.remove(self.snake[0])
-            reward = 1
-            self.create_apples()     # new apple
+            reward = 10
+            self.create_apples()
         else:
             self.snake.pop()
             self.check_collisions()
             if self.done:
-                reward = -1
+                reward = -10
             else:
-                reward = 0
-        if reward>=0:
-            x,y = self.snake[0]
-            reward += self.grass[x,y]
-            self.grass[x,y] = 0
-            self.score+=reward
+                reward = 0.0   # antes era -0.1 → agora penalidade menor por passo
+
+        if reward > -1:  
+            # Calcula Manhattan distance ao apple mais próximo
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            max_dist = self.width + self.height - 2
+            bonus = 3.0 * ((max_dist - manhattan) / max_dist)  # AUMENTEI para 3.0 
+            reward += bonus 
+            
+            if self.snake and self.apples:
+                hy, hx = self.snake[0]   # posição da cabeça
+                ay, ax = self.apples[0]  # posição da maçã
+                # Se a maçã estiver no mesmo y e a direção for E (=1) ou W (=3), ou
+                # a maçã estiver no mesmo x e a direção for N (=0) ou S (=2), 
+                # então a cabeça está “alinhada” e a rede deve “ir reto”.
+                if (hy == ay and ((ax > hx and self.direction == 1) or (ax < hx and self.direction == 3))) \
+                       or (hx == ax and ((ay < hy and self.direction == 0) or (ay > hy and self.direction == 2))):
+                    reward += 5.0   # bônus extra de “alinhamento”
+
+            # Adicionar penalidade por se afastar
+            if hasattr(self, 'last_manhattan') and self.last_manhattan is not None and manhattan > self.last_manhattan:
+                reward -= 2.0  # Aumentado de 0.1 para 0.5
+            self.last_manhattan = manhattan
+
+
+
+            # Aplica grass como antes
+            x, y = self.snake[0]
+            reward += self.grass[x, y]
+            self.grass[x, y] = 0
+            self.score += reward
             self.grass += self.grass_growth 
-            self.grass[self.grass>self.max_grass] = self.max_grass
-                
-        return self.board_state(),reward,self.done, {'score':self.score}
+            self.grass[self.grass > self.max_grass] = self.max_grass
+                    
+        return self.board_state(), reward, self.done, {'score': self.score}
 
     def get_state(self):
         "easily get current state (score, apple, snake head and tail)"        
@@ -138,6 +165,7 @@ class SnakeGame:
         self.apples = []
         self.create_apples()
         self.grass[:,:] =  self.max_grass
+        self.last_manhattan = None  
         
         return self.board_state(),0,self.done, {'score':self.score}
     

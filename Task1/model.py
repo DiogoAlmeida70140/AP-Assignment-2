@@ -6,16 +6,27 @@ import torch.optim as optim
 import os
 
 class CNN_QNet(nn.Module):
-    def __init__(self, input_shape=(1, 32, 32), num_actions=3):  # 1 canal
+    def __init__(self, input_shape=(1, 32, 32), num_actions=3):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=5, stride=1, padding=2)  # Alterado de 3 para 1
+        c, h, w = input_shape  # c=channels, h=height, w=width
+
+        self.conv1 = nn.Conv2d(c, 32, kernel_size=5, stride=1, padding=2)
         self.bn1 = nn.BatchNorm2d(32)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
         self.pool2 = nn.MaxPool2d(2, 2)
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(64 * 8 * 8, 256)
+
+        # Compute the size after conv/pool layers
+        with torch.no_grad():
+            dummy = torch.zeros(1, c, h, w)
+            dummy = self.pool(F.relu(self.bn1(self.conv1(dummy))))
+            dummy = self.pool2(F.relu(self.bn2(self.conv2(dummy))))
+            dummy = F.relu(self.conv3(dummy))
+            flatten_size = dummy.view(1, -1).size(1)
+
+        self.fc1 = nn.Linear(flatten_size, 256)
         self.dropout = nn.Dropout(p=0.2)
         self.fc2 = nn.Linear(256, num_actions)
 

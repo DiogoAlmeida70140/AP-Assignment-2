@@ -1,5 +1,6 @@
-# Virtual Environment
+# Virtual Environments
 virtual_ap/
+venv/
 
 # Cache
 __pycache__/
