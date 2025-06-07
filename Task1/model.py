@@ -6,6 +6,8 @@ import torch.optim as optim
 import os
 
 class CNN_QNet(nn.Module):
+    model_folder_path = './Task1/model'
+
     def __init__(self, input_shape=(1, 32, 32), num_actions=3):
         super().__init__()
         c, h, w = input_shape  # c=channels, h=height, w=width
@@ -42,10 +44,19 @@ class CNN_QNet(nn.Module):
         return self.fc2(x)
 
     def save(self, file_name='model.pth'):
-        model_folder_path = './Task1/model'
-        os.makedirs(model_folder_path, exist_ok=True)
-        file_name = os.path.join(model_folder_path, file_name)
+        os.makedirs(CNN_QNet.model_folder_path, exist_ok=True)
+        file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
+
+    @staticmethod
+    def load(env, file_name='model.pth'):
+        file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
+        if not os.path.exists(file_name):
+            raise FileNotFoundError(f"Model file {file_name} does not exist.")
+        model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border), num_actions=3)
+        model.load_state_dict(torch.load(file_name))
+        return model
+
 
 
 class QTrainer:

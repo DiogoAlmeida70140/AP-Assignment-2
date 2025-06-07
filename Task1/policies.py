@@ -121,6 +121,8 @@ def bfs_path(head, apple, snake_body, width, height, border):
     path.reverse()
     return path
 
+path = []
+
 def heuristic_policy(env):
     """
     Heuristic policy to move the snake toward the apple using BFS or a one-step look-ahead.
@@ -129,6 +131,7 @@ def heuristic_policy(env):
     Returns:
         Action (-1, 0, 1) for left, straight, or right
     """
+    global path
     score, apples, head, tail, direction = env.get_state()
     if not apples:
         return 0
@@ -138,10 +141,14 @@ def heuristic_policy(env):
 
     # BFS path
     # path = bfs_path(head, apple, [head] + tail, env.width, env.height, env.border)
-    path = bfs_path(head, apple, [head] + tail, env.width, env.height, env.border)
+    if len(path) == 0:
+        path = astar_path(head, apple, [head] + tail, env.width, env.height, env.border)
+        if path is not None:
+            path.pop(0)  # Remove o head do início do caminho
+
     if path is not None and len(path) >= 2:
         # O segundo nó de path é a próxima célula para onde nos devemos mover
-        next_cell = path[1]
+        next_cell = path.pop(0)
         ny, nx = next_cell
         # Calcula “direção desejada” com base na diferença entre head e next_cell
         # Se head=(hy,hx) e next_cell=(ny,nx), então:
@@ -155,17 +162,7 @@ def heuristic_policy(env):
             desired = 3  # W
 
         # Converte desired em action = {-1,0,1} baseando-se em “direction”
-        diff = (desired - direction) % 4
-        if diff == 0:
-            action = 0
-        elif diff == 1:
-            action = 1
-        elif diff == 3:
-            action = -1
-        else:
-            action = 0
-
-        return action
+        return (desired - direction + 2) & 3 - 2
 
     # Fallback: one-step look-ahead
     if ay < hy:

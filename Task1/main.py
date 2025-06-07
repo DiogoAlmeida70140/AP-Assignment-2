@@ -1,25 +1,23 @@
-# --- Main ---------------------------------------------------------------
-import os
 from train import *
-from model import CNN_QNet
 from snake_game import SnakeGame
-import torch
-
-
 
 def get_model(env, force_train=False):
     """
     Returns the trained model, optionally retraining it.
     """
 
-    if force_train:
-        model = train(env)
-        model.save()
-        print("Modelo salvo em:", model.save_path)
-    else:
-        model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border), num_actions=3)
-        model.load_state_dict(torch.load('./Task1/model/model.pth'))
-        model.to(device)
+    if not force_train:
+        try:
+            return CNN_QNet.load(env, file_name='model.pth').to(device)
+        except FileNotFoundError:
+            print("Modelo não encontrado, iniciando treino...")
+        except:
+            pass
+    
+    model = train(env)
+    model.save(file_name='model.pth')
+    print("Modelo salvo em:" + model.model_folder_path + '/model.pth')
+        
     return model
 
 
@@ -33,11 +31,11 @@ if __name__ == '__main__':
         print("Running on CPU")
         
     board_size = (14, 14)
-    border =1
+    border = 1
     env = SnakeGame(*board_size, border=border)
 
     model = get_model(env, force_train=False)
-
+    
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
         
@@ -46,7 +44,7 @@ if __name__ == '__main__':
     # # # play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
     # # # 3) Avalia e mostra as top 3 partidas entre 5000
     #evaluate_and_show_best(model, env, num_eval_episodes=10, top_k=3, scale=10, slow_fps=5)
-    play(model, env, num_eval_episodes=1000, top_k=5)
+    play(model, env, num_eval_episodes=100, top_k=10)
     
     
     

@@ -4,12 +4,12 @@ import torch
 import random
 import time
 import csv
-from snake_game import SnakeGame
 from model import CNN_QNet, QTrainer
 import matplotlib.pyplot as plt
 import cv2
 import pygame
 from policies import *
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -34,30 +34,31 @@ def preprocess(state):
     return np.expand_dims(idx_img, axis=0)  # (1, H, W)
 
 
-def get_action(model, state, epsilon, step_count=0):
+def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
     if random.random() < epsilon:
         return random.choice([-1, 0, 1]), step_count + 1
     state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
     with torch.no_grad():
         q_values = model(state_tensor)
-    if step_count % 100 == 0:  # Imprime a cada 100 passos
+    if print_qvalues and step_count % 1000 == 0:  # Imprime a cada 100 passos
         print(f"Step {step_count}, Q-values: {q_values.tolist()}")
     return torch.argmax(q_values).item() - 1, step_count + 1
 
 # --- Training -----------------------------------------------------------
-def train(env, save_model=True):
+def train(env):
     EPISODES = 2000
     EPS_START = 1.0
-    EPS_DECAY = 0.999
+    EPS_DECAY = 0.9995
     EPS_MIN = 0.1
     GAMMA = 0.99
     LR = 1e-4
 
-    heuristic_prob = 0.1  # Probabilidade de usar heurística nos primeiros episódios
+    heuristic_prob = 0.5  # Probabilidade de usar heurística nos primeiros episódios
     heuristic_epoch_limit = 500  # Limite de episódios para usar heurística
 
-    model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
+    model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border))
     trainer = QTrainer(model, lr=LR, gamma=GAMMA)
+    model = trainer.model
 
     metrics = []
     losses = []
@@ -116,7 +117,7 @@ def train(env, save_model=True):
     save_metrics(metrics, losses)
     show_metrics(metrics, losses)
 
-    return model, metrics, losses
+    return model
 
 def save_metrics(metrics, losses):
     # Salvando métricas + losses em CSV
@@ -202,20 +203,21 @@ def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
         
         raw_frames.append(raw_state.copy())
         state = preprocess(raw_state)
-        total = 0
+        total_reward = 0
+        step_count = 0
         
         while not done:
-            action = get_action(model, state, epsilon=0)[0]
+            action, step_count = get_action(model, state, epsilon=0, step_count=step_count)
             raw_next, reward, done, _ = env.step(action)
             raw_frames.append(raw_next.copy())
             state = preprocess(raw_next)
-            total += reward
+            total_reward += reward
         
-        results.append((total, raw_frames))
-        print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total:.2f}")
+        results.append((total_reward, raw_frames))
+        print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {step_count}")
     
     # Selecionar os top_k melhores episódios
-    results.sort(key=lambda x: x[0], reverse=True)
+    results.sort(key=lambda x: len(x[1]), reverse=True)
     top_results = results[:top_k]
     print(f"\nTop {top_k} resultados (score, n_passos):")
     for idx, (sc, frames) in enumerate(top_results, start=1):
@@ -223,7 +225,7 @@ def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
     
     # Mostrar os melhores jogos em Pygame
     pygame.init()
-    window_size = ((width + 2 * border) * scale, (height + 2 * border) * scale)
+    window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
     screen = pygame.display.set_mode(window_size)
     pygame.display.set_caption("Top Jogadas - Snake DQN")
     clock = pygame.time.Clock()
