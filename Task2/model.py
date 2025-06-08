@@ -6,7 +6,7 @@ import torch.optim as optim
 import os
 
 class CNN_QNet(nn.Module):
-    model_folder_path = './Task1/model'
+    model_folder_path = './Task2/model'
 
     def __init__(self, input_shape=(1, 32, 32), num_actions=3):
         super().__init__()
@@ -68,38 +68,6 @@ class QTrainer:
         self.gamma = gamma
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
-
-    # def train_step(self, state, action, reward, next_state, done):
-    #     # Convert to torch tensors
-    #     state = torch.tensor(state, dtype=torch.float32).to(self.device)
-    #     next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
-    #     action = torch.tensor(action, dtype=torch.int64).to(self.device)
-    #     reward = torch.tensor(reward, dtype=torch.float32).to(self.device)
-
-
-    #     if len(state.shape) == 3:  # single sample
-    #         state = state.unsqueeze(0)
-    #         next_state = next_state.unsqueeze(0)
-    #         action = action.unsqueeze(0)
-    #         reward = reward.unsqueeze(0)
-    #         done = (done,)
-
-    #     # Predicted Q values
-    #     pred = self.model(state)
-    #     target = pred.clone()
-
-    #     for i in range(len(done)):
-    #         Q_new = reward[i]
-    #         if not done[i]:
-    #             Q_new += self.gamma * torch.max(self.model(next_state[i].unsqueeze(0)))
-    #         target[i][action[i]] = Q_new
-
-    #     self.optimizer.zero_grad()
-    #     loss = self.criterion(target, pred)
-    #     loss.backward()
-    #     self.optimizer.step()
-    #     return loss.item() #return the loss value
-    
     
     def train_step(self, q_current_action, q_targets): # <- MODIFICADO: Agora aceita Q-values atuais e targets
         """

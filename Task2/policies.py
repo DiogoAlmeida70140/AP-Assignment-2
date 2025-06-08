@@ -156,7 +156,7 @@ def heuristic_policy(env, pathfind="bfs"):
     hy, hx = head
     ay, ax = apple
 
-    # 1) Usa BFS para encontrar o caminho mais curto até à maçã
+    # 1) Usa BFS ou A* para encontrar o caminho mais curto até à maçã
     pathfinder = bfs_path if pathfind == "bfs" else astar_path
     if path is None or len(path) == 0:
         path = pathfinder(head, apple, [head] + tail, env.width, env.height, env.border)
@@ -168,7 +168,6 @@ def heuristic_policy(env, pathfind="bfs"):
         next_cell = path.pop(0)
         ny, nx = next_cell
         # Calcula “direção desejada” com base na diferença entre head e next_cell
-        # Se head=(hy,hx) e next_cell=(ny,nx), então:
         if ny < hy:
             desired = 0  # N
         elif ny > hy:
@@ -178,15 +177,19 @@ def heuristic_policy(env, pathfind="bfs"):
         else:
             desired = 3  # W
 
-        # Converte desired em action = {-1,0,1} baseando-se em “direction”
-        action = ((desired - direction + 2) & 3) - 2
+        # Converte desired em action = {-1, 0, 1} baseando-se em “direction”
+        diff = (desired - direction) % 4  # Normalize to [0, 1, 2, 3]
+        if diff == 0:
+            action = 0  # Continue straight
+        elif diff == 1 or diff == 3:
+            action = 1 if diff == 1 else -1  # Turn right (diff=1) or left (diff=3)
+        else:
+            action = 0  # Opposite direction (diff=2), default to straight
         return action
 
-    # 2) Se não existir caminho via BFS (path is None), volta ao “look-ahead” de 1 passo:
+    # 2) Se não existir caminho via BFS/A* (path is None), volta ao “look-ahead” de 1 passo:
     #    tenta a ação que evita colisões no próximo movimento
     hy, hx = head
-    # Tenta ação “direção desejada” original antes usada (apontar à fruta)
-    # Reutiliza a lógica anterior para “desired” e “diff”
     if ay < hy:
         desired = 0
     elif ay > hy:
@@ -196,7 +199,13 @@ def heuristic_policy(env, pathfind="bfs"):
     else:
         desired = 3
 
-    action = ((desired - direction + 2) & 3) - 2
+    diff = (desired - direction) % 4
+    if diff == 0:
+        action = 0
+    elif diff == 1 or diff == 3:
+        action = 1 if diff == 1 else -1
+    else:
+        action = 0  # Default to straight if opposite direction
 
     # Simula “ver qual a célula seguinte” se usares action
     nd = (direction + action) % 4

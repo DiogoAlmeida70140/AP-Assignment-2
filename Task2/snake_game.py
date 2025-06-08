@@ -62,7 +62,7 @@ class SnakeGame:
     def check_collisions(self):
         "check if game is over by colliding with edge or itself"
         # just need to check snake's head
-        x,y = self.snake[0]
+        y,x = self.snake[0]
         if (x == -1 or x == self.height 
             or y == -1 or y == self.width
             or (x,y) in self.snake[1:]):

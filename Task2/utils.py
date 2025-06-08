@@ -14,16 +14,3 @@ def preprocess(state):
     state_gray = cv2.cvtColor(state_uint8, cv2.COLOR_RGB2GRAY) # Correção aqui
     state_gray = state_gray / 255.0 # Normaliza de volta para [0, 1]
     return np.expand_dims(state_gray, axis=0) # (1, H, W)
-
-"""def preprocess(state):
-    # Assume state is (H, W, 3) RGB with only 4 unique colors
-    # Map each unique color to an index 1,2,3,4
-    # First, define the color palette (hardcoded or inferred)
-    state_reshaped = state.reshape(-1, 3)
-    unique_colors = np.unique(state_reshaped, axis=0)
-    # Sort for consistency
-    unique_colors = np.array(sorted([tuple(c) for c in unique_colors]))
-    color_to_idx = {tuple(color): idx+1 for idx, color in enumerate(unique_colors)}
-    idx_map = np.array([color_to_idx[tuple(pixel)] for pixel in state_reshaped])
-    idx_img = idx_map.reshape(state.shape[0], state.shape[1])
-    return np.expand_dims(idx_img, axis=0)  # (1, H, W)"""
