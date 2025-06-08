@@ -63,7 +63,7 @@ class ReplayBuffer:
             policy_func (callable): A função da política a ser usada para gerar ações (e.g., random_policy, heuristic_policy).
             num_steps (int): O número de passos a serem executados para popular o buffer.
         """
-        print(f"A popular o buffer de replay com {num_steps} passos...")
+        #print(f"A popular o buffer de replay com {num_steps} passos...")
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
         
@@ -83,4 +83,4 @@ class ReplayBuffer:
                 preprocessed_state = preprocess(state_raw)
             else:
                 preprocessed_state = preprocessed_next_state
-        print(f"Buffer populado. Tamanho atual: {len(self)}")
+        #print(f"Buffer populado. Tamanho atual: {len(self)}")

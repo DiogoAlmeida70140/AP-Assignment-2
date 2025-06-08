@@ -18,10 +18,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Treinamento --------------------------------------------------------
 def train(env, num_episodes=2000, max_steps_per_episode=1000,
-          epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995,
+          epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.999,
           batch_size=64, learning_rate=0.0005, gamma=0.99,
-          buffer_capacity=10000, num_warmup_steps=5000,
-          target_update_freq=100, inject_interval=20, inject_amount=1000):
+          buffer_capacity=10000, num_warmup_steps=3000,
+          target_update_freq=100, inject_interval=10, inject_amount=2000):
 
     # Modelo principal (online network)
     model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
@@ -48,7 +48,7 @@ def train(env, num_episodes=2000, max_steps_per_episode=1000,
         # --- Injecting experiências ---
         if episode > 0 and episode % inject_interval == 0:
             replay_buffer.populate(env, heuristic_policy, inject_amount)
-            print(f">>> Injected {inject_amount} heuristic experiences at episode {episode}")
+            #print(f">>> Injected {inject_amount} heuristic experiences at episode {episode}")
 
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
@@ -108,7 +108,8 @@ def train(env, num_episodes=2000, max_steps_per_episode=1000,
             model.save("best_model.pth")
 
         elapsed_time = time.time() - start_time
-        print(f'Episódio {episode+1}/{num_episodes} | Score: {score:.2f} | Recorde: {record:.2f} | Epsilon: {epsilon:.2f} | Média Score (100): {mean_score:.2f} | Passos no episódio: {steps_in_episode} | Tempo Decorrido: {elapsed_time:.1f}s')
+        if episode % 100 == 0:
+            print(f'Episódio {episode+1}/{num_episodes} | Score: {score:.2f} | Recorde: {record:.2f} | Epsilon: {epsilon:.2f} | Média Score (100): {mean_score:.2f} | Passos no episódio: {steps_in_episode} | Tempo Decorrido: {elapsed_time:.1f}s')
 
         plot_scores.append(score)
         plot_mean_scores.append(mean_score)
