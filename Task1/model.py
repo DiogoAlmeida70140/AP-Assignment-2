@@ -5,10 +5,13 @@ import torch.nn.functional as F
 import torch.optim as optim
 import os
 
+
+unique_color_num = 6
+
 class CNN_QNet(nn.Module):
     model_folder_path = './Task1/model'
 
-    def __init__(self, input_shape=(1, 32, 32), num_actions=3):
+    def __init__(self, input_shape=(5, 32, 32), num_actions=3):
         super().__init__()
         c, h, w = input_shape  # c=channels, h=height, w=width
 
@@ -53,7 +56,7 @@ class CNN_QNet(nn.Module):
         file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         if not os.path.exists(file_name):
             raise FileNotFoundError(f"Model file {file_name} does not exist.")
-        model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border), num_actions=3)
+        model = CNN_QNet(input_shape=(unique_color_num, env.height + 2 * env.border, env.width + 2 * env.border), num_actions=3)
         model.load_state_dict(torch.load(file_name))
         return model
 
@@ -67,7 +70,7 @@ class QTrainer:
         self.lr = lr
         self.gamma = gamma
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.SmoothL1Loss()
 
     def train_step(self, state, action, reward, next_state, done):
         # Convert to torch tensors
@@ -86,12 +89,13 @@ class QTrainer:
 
         # Predicted Q values
         pred = self.model(state)
-        target = pred.clone()
+        target = pred.clone().detach()
 
         for i in range(len(done)):
             Q_new = reward[i]
             if not done[i]:
-                Q_new += self.gamma * torch.max(self.model(next_state[i].unsqueeze(0)))
+                with torch.no_grad():
+                    Q_new += self.gamma * torch.max(self.model(next_state[i].unsqueeze(0))).item()
             target[i][action[i]] = Q_new
 
         self.optimizer.zero_grad()

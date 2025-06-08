@@ -139,7 +139,6 @@ def reset_path():
     global path
     path=[]
 
-
 def heuristic_policy(env, pathfind="bfs"):
     """
     Heuristic policy to move the snake toward the apple using BFS or a one-step look-ahead.
@@ -152,7 +151,8 @@ def heuristic_policy(env, pathfind="bfs"):
     score, apples, head, tail, direction = env.get_state()
     if not apples:
         return 0
-    apple = apples[0]
+
+    apple = min(apples, key=lambda a: manhattan(head, a))
     hy, hx = head
     ay, ax = apple
 

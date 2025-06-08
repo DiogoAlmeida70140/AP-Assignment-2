@@ -5,12 +5,10 @@ import numpy as np
 from numpy.random import randint
 
 class SnakeGame:
-    " Implements the snake game core"
-
     def __init__(self, width, height, food_amount=1,
-                 border = 0, grass_growth = 0.01,
-                 max_grass = 0.5):
-        "Initialize board"
+             border = 0, grass_growth = 0,
+             max_grass = 0):
+        """Initialize board"""
         self.width = width
         self.height = height
         self.board = np.zeros( (height,width,3),dtype = np.float32)
@@ -20,6 +18,7 @@ class SnakeGame:
         self.grass = np.zeros( (height,width) ) + max_grass
         self.max_grass = max_grass
         self.reset()
+        self.last_manhattan = 1 # some value to start
 
     def create_apples(self):
         "create a new apple away from the snake"
@@ -30,7 +29,7 @@ class SnakeGame:
             self.apples.append(apple)
 
     def create_snake(self):
-        "create a snake, size 3, at random position and orientation"
+        """create a snake, size 3, at random position and orientation"""
         x = randint( 5, self.width-5 )   # not t0o close to border
         y = randint( 5, self.height-5 )
         self.direction = randint(0,4)
@@ -47,7 +46,7 @@ class SnakeGame:
             self.snake.append( (y,x) )
 
     def grow_snake(self, d):
-        "add one position to snake head (0=up, 1=right, 2=down, 3=left)"
+        """add one position to snake head (0=up, 1=right, 2=down, 3=left)"""
         y,x = self.snake[0]
         if d == 0:
             y = y-1
@@ -81,9 +80,9 @@ class SnakeGame:
         elif self.direction>3:
             self.direction = 0
         self.grow_snake(self.direction)  # two steps: grow+remove last
-        if self.snake[0] in self.apples:            
+        if self.snake[0] in self.apples:
             self.apples.remove(self.snake[0])
-            reward = 5
+            reward = 1
             self.create_apples()     # new apple
         else:
             self.snake.pop()
@@ -91,8 +90,15 @@ class SnakeGame:
             if self.done:
                 reward = -1
             else:
-                reward = 0
-        if reward>=0:
+                reward = +0.01
+
+        if reward != -1:
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            reward -= (manhattan - self.last_manhattan) * 0.1
+            self.last_manhattan = manhattan
+
             x,y = self.snake[0]
             reward += self.grass[x,y]
             self.grass[x,y] = 0

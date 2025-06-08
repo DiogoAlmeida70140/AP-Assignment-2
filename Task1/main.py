@@ -1,4 +1,3 @@
-#from train import *
 from snake_game import SnakeGame
 from train import *
 
@@ -8,13 +7,12 @@ def id_from_env(env):
     """
     return f"{env.width}x{env.height}_b{env.border}_g{env.grass_growth}_{env.max_grass}_"
 
-
 def get_model(env, force_train=False, file_name=''):
     """
     Returns the trained model, optionally retraining it.
     """
-    if not file_name:
-        file_name = f"{id_from_env(env)}{file_name}.pth"
+
+    file_name = f"{id_from_env(env)}{file_name}.pth"
 
     if not force_train:
         try:
@@ -42,23 +40,18 @@ if __name__ == '__main__':
         
     board_size = (14, 14)
     border = 1
-    env = SnakeGame(*board_size, border=border)
+    env = SnakeGame(*board_size, border=border, food_amount=5)
 
-    model = get_model(env, force_train=False, file_name='model4.pth')
+    model = get_model(env, force_train=False, file_name = 'test')
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
         
     # model.eval()
-
-    # Mostra o modelo com a heuristica
-    #play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
+    # # # Mostra o modelo com a heuristica
+    # # # play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
     # # # 3) Avalia e mostra as top 3 partidas entre 5000
-    #evaluate_and_show_best(model, env, num_eval_episodes=10, top_k=3, scale=10, slow_fps=5)
-    play(model, env, num_eval_episodes=100, top_k=10)
-    
-    
-    
+    play(model, env, num_eval_episodes=100, top_k=5)
     
         
     

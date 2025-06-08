@@ -4,14 +4,33 @@ import torch
 import random
 import time
 import csv
-from model import CNN_QNet, QTrainer
+from model import CNN_QNet, QTrainer, unique_color_num
 import matplotlib.pyplot as plt
 import cv2
 import pygame
 from policies import *
-from utils import preprocess
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def preprocess(state):
+    """
+    Converts RGB state image to one-hot encoded tensor (5, H, W) for CNN.
+    Assumes only 5 unique RGB values (for head, body, apple, wall, background).
+    """
+    H, W, _ = state.shape
+    state_reshaped = state.reshape(-1, 3)
+    unique_colors = np.unique(state_reshaped, axis=0)
+    unique_colors = np.array(sorted([tuple(c) for c in unique_colors]))  # Consistent ordering
+
+    color_to_idx = {tuple(color): idx for idx, color in enumerate(unique_colors)}
+    idx_map = np.array([color_to_idx[tuple(pixel)] for pixel in state_reshaped])
+    idx_img = idx_map.reshape(H, W)
+
+    # One-hot encode (H, W) -> (5, H, W)
+    one_hot = np.eye(unique_color_num)[idx_img]  # (H, W, 5)
+    one_hot = one_hot.transpose(2, 0, 1)  # (5, H, W)
+
+    return one_hot.astype(np.float32)
 
 def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
     if random.random() < epsilon:
@@ -19,7 +38,7 @@ def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
     state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
     with torch.no_grad():
         q_values = model(state_tensor)
-    if print_qvalues and step_count % 1000 == 0:  # Imprime a cada 100 passos
+    if print_qvalues and step_count % 100 == 0:  # Imprime a cada 100 passos
         print(f"Step {step_count}, Q-values: {q_values.tolist()}")
     return torch.argmax(q_values).item() - 1, step_count + 1
 
@@ -27,17 +46,16 @@ def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
 def train(env):
     EPISODES = 2000
     EPS_START = 1.0
-    EPS_DECAY = 0.9995
-    EPS_MIN = 0.1
-    GAMMA = 0.99
-    LR = 1e-4
+    EPS_DECAY = 0.999
+    EPS_MIN = 0.05
+    GAMMA = 0.5
+    LR = 1e-5
 
     heuristic_prob = 0.5  # Probabilidade de usar heurística nos primeiros episódios
     heuristic_epoch_limit = 500  # Limite de episódios para usar heurística
 
-    model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border))
+    model = CNN_QNet(input_shape=(unique_color_num, env.height + 2 * env.border, env.width + 2 * env.border))
     trainer = QTrainer(model, lr=LR, gamma=GAMMA)
-    model = trainer.model
 
     metrics = []
     losses = []
@@ -50,22 +68,26 @@ def train(env):
         state = preprocess(state)
         total_reward = 0
         episode_losses = []
-        # Aqui: mix de heurística nos primeiros 500 episódios (10% das vezes)
+
         used_heuristic = ep <= heuristic_epoch_limit and random.random() < heuristic_prob
-        reset_path()
+
         i = int(ep * heuristic_prob)
+        reset_path()
         while not done:
             if used_heuristic and i <= heuristic_epoch_limit:
                 action = heuristic_policy(env, pathfind="astar")
+                update_model = False
             else:
-                action, step_count = get_action(model, state, epsilon, step_count)
+                action, step_count = get_action(trainer.model, state, epsilon, step_count, print_qvalues=True)
+                update_model = True
             i += 1
 
             next_state, reward, done, _ = env.step(action)
             next_state = preprocess(next_state)
-            # Train step: note que action+1 faz mapear {–1,0,1} → {0,1,2}
-            loss = trainer.train_step(state, action + 1, reward, next_state, done)
-            episode_losses.append(loss)
+            if update_model:
+                # Train step: note que action+1 faz mapear {–1,0,1} → {0,1,2}
+                loss = trainer.train_step(state, action + 1, reward, next_state, done)
+                episode_losses.append(loss)
 
             state = next_state
             total_reward += reward
@@ -96,7 +118,7 @@ def train(env):
     save_metrics(metrics, losses)
     show_metrics(metrics, losses)
 
-    return model
+    return trainer.model
 
 def save_metrics(metrics, losses):
     # Salvando métricas + losses em CSV
