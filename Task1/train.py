@@ -9,30 +9,9 @@ import matplotlib.pyplot as plt
 import cv2
 import pygame
 from policies import *
+from utils import preprocess
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-# --- Helpers ------------------------------------------------------------
-def preprocess2(state):
-    # Converte para grayscale
-    state_gray = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-    state_gray = state_gray / 255.0  # Normaliza
-    return np.expand_dims(state_gray, axis=0)  # (1, H, W)
-
-def preprocess(state):
-    # Assume state is (H, W, 3) RGB with only 4 unique colors
-    # Map each unique color to an index 1,2,3,4
-    # First, define the color palette (hardcoded or inferred)
-    state_reshaped = state.reshape(-1, 3)
-    unique_colors = np.unique(state_reshaped, axis=0)
-    # Sort for consistency
-    unique_colors = np.array(sorted([tuple(c) for c in unique_colors]))
-    color_to_idx = {tuple(color): idx+1 for idx, color in enumerate(unique_colors)}
-    idx_map = np.array([color_to_idx[tuple(pixel)] for pixel in state_reshaped])
-    idx_img = idx_map.reshape(state.shape[0], state.shape[1])
-    return np.expand_dims(idx_img, axis=0)  # (1, H, W)
-
 
 def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
     if random.random() < epsilon:
@@ -73,11 +52,11 @@ def train(env):
         episode_losses = []
         # Aqui: mix de heurística nos primeiros 500 episódios (10% das vezes)
         used_heuristic = ep <= heuristic_epoch_limit and random.random() < heuristic_prob
-
-        i = ep
+        reset_path()
+        i = int(ep * heuristic_prob)
         while not done:
             if used_heuristic and i <= heuristic_epoch_limit:
-                action = heuristic_policy(env)
+                action = heuristic_policy(env, pathfind="astar")
             else:
                 action, step_count = get_action(model, state, epsilon, step_count)
             i += 1
@@ -250,191 +229,4 @@ def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
     
     print("Fim da reprodução das melhores partidas.")
     pygame.quit()
-    
-# # --- Play & Visualization ----------------------------------------------
-# def play(model, env, scale=10, fps=30, num_episodes=1000):
-#     import pygame
-#     pygame.init()
-#     screen = pygame.display.set_mode((32*scale,32*scale))
-#     pygame.display.set_caption("Snake DQN Play")
-#     clock = pygame.time.Clock()
-#     scores = []
-#     start = time.time()
 
-#     for ep in range(1, num_episodes+1):
-#         raw_state, _, done, _ = env.reset()
-#         state = preprocess(raw_state)
-#         total = 0
-
-#         while not done:
-#             for event in pygame.event.get():
-#                 if event.type == pygame.QUIT:
-#                     pygame.quit()
-#                     return
-
-#             action = get_action(model, state, epsilon=0)
-#             raw_next, reward, done, _ = env.step(action)
-#             state = preprocess(raw_next)
-#             total += reward
-
-#             # render using raw_next
-#             disp = (raw_next * 255).astype(np.uint8)
-#             surf = pygame.surfarray.make_surface(disp)
-#             surf = pygame.transform.scale(surf,(32*scale,32*scale))
-#             screen.blit(surf,(0,0))
-#             pygame.display.flip()
-#             clock.tick(fps)
-
-#         scores.append(total)
-#         print(f"Play Ep {ep} | Score: {total:.2f}")
-
-#     print(f"Score médio: {np.mean(scores):.2f}, Tempo: {time.time()-start:.1f}s")
-
-# # --- Avaliação e Reprodução das Melhores Partidas ------------------------
-# def evaluate_and_show_best(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
-#     """
-#     Avalia o agente em `num_eval_episodes` partidas (epsilon=0), 
-#     mantém na memória todas as frames + a pontuação final de cada partida,
-#     seleciona as `top_k` partidas de maior pontuação e
-#     reproduz (devagar) essas partidas usando Pygame a slow_fps.
-#     """
-
-#     # 1. Executar N episódios de avaliação, guardando trajes
-#     results = []  # list of (score_final, [raw_frame0, raw_frame1, ...])
-
-#     for ep in range(1, num_eval_episodes + 1):
-#         raw_frames = []
-#         raw_state, _, done, _ = env.reset()
-        
-#         if ep == 1:
-#             # imprime os Q‐values do estado inicial (fora do laço de coleta de frames)
-#             state_tensor = preprocess(raw_state)
-#             with torch.no_grad():
-#                 qs = model(torch.tensor(state_tensor, dtype=torch.float32).unsqueeze(0).to(device))
-#             print("Q‐values iniciais para estado inicial:", qs.cpu().numpy().tolist())
-        
-#         raw_frames.append(raw_state.copy())
-#         state = preprocess(raw_state)
-#         total = 0
-
-#         while not done:
-#             action = get_action(model, state, epsilon=0)[0]
-#             raw_next, reward, done, _ = env.step(action)
-#             raw_frames.append(raw_next.copy())
-#             state = preprocess(raw_next)
-#             total += reward
-
-#         results.append((total, raw_frames))
-#         print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total:.2f}")
-
-#     # 2. Ordenar por pontuação decrescente e selecionar top_k
-#     results.sort(key=lambda x: x[0], reverse=True)
-#     top_results = results[:top_k]
-#     print(f"\nTop {top_k} resultados (score, n_passos):")
-#     for idx, (sc, frames) in enumerate(top_results, start=1):
-#         print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames)-1}")
-
-#     # 3. Para cada partida entre as top_k, reproduzir em Pygame a slow_fps
-#     pygame.init()
-#     window_size = (32*scale, 32*scale)
-#     screen = pygame.display.set_mode(window_size)
-#     pygame.display.set_caption("Top Jogadas - Snake DQN")
-#     clock = pygame.time.Clock()
-
-#     for rank, (score_final, raw_frames) in enumerate(top_results, start=1):
-#         print(f"\nReproduzindo partida #{rank} com Score={score_final:.2f} em {slow_fps} FPS...")
-#         for raw in raw_frames:
-#             for event in pygame.event.get():
-#                 if event.type == pygame.QUIT:
-#                     pygame.quit()
-#                     return
-
-#             disp = (raw * 255).astype(np.uint8)
-#             surf = pygame.surfarray.make_surface(disp)
-#             surf = pygame.transform.scale(surf, (32*scale, 32*scale))
-#             screen.blit(surf, (0, 0))
-#             pygame.display.flip()
-#             clock.tick(slow_fps)
-
-#         # Após terminar os frames de uma partida, pausar 1s antes de ir para a próxima
-#         time.sleep(1)
-
-#     print("Fim da reprodução das melhores partidas.")
-#     pygame.quit()
-    
-    
-# def evaluate_heuristic_baseline(env, num_episodes=100):
-#     scores = []
-#     for ep in range(num_episodes):
-#         _, _, done, _ = env.reset()
-#         total = 0
-#         while not done:
-#             a = heuristic_policy(env)
-#             _, r, done, _ = env.step(a)
-#             total += r
-#         scores.append(total)
-#     scores = np.array(scores)
-#     print(f"Heuristic baseline em {num_episodes} episódios:")
-#     print(f"  Média: {scores.mean():.2f}")
-#     print(f"  Desvio padrão: {scores.std():.2f}")
-#     print(f"  Máximo: {scores.max():.2f}")
-#     print(f"  Mínimo: {scores.min():.2f}")
-#     return scores
-
-# def play_with_heuristic(env, scale=10, fps=5, num_episodes=10):
-#     pygame.init()
-#     screen = pygame.display.set_mode((32 * scale, 32 * scale))
-#     pygame.display.set_caption("Snake Heuristic Play")
-#     clock = pygame.time.Clock()
-#     scores = []
-#     start_time = time.time()
-#     paused = False
-
-#     for ep in range(1, num_episodes + 1):
-#         raw_state, _, done, info = env.reset()
-#         total = 0
-#         step_count = 0
-#         while not done:
-#             for event in pygame.event.get():
-#                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-#                     pygame.quit()
-#                     return
-#                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-#                     paused = not paused
-
-#             if paused:
-#                 clock.tick(fps)
-#                 continue
-
-#             # Get heuristic action
-#             action = heuristic_policy(env)
-#             print(f"Ep {ep}, Step {step_count}, Action: {action}, Head: {env.snake[0]}, Apple: {env.apples[0] if env.apples else None}")
-#             raw_next, reward, done, info = env.step(action)
-#             total += reward
-#             step_count += 1
-
-#             # Render current frame
-#             disp = (raw_next * 255).astype(np.uint8)
-#             surf = pygame.surfarray.make_surface(disp)
-#             surf = pygame.transform.scale(surf, (32 * scale, 32 * scale))
-#             screen.blit(surf, (0, 0))
-#             pygame.display.flip()
-#             clock.tick(fps)
-
-#         scores.append(total)
-#         print(f"Heuristic Ep {ep}/{num_episodes} | Score: {total:.2f}, Steps: {step_count}")
-
-#         # Pause briefly to show final state
-#         pygame.time.wait(500)
-#         for _ in range(int(fps * 0.5)):
-#             for event in pygame.event.get():
-#                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-#                     pygame.quit()
-#                     return
-#                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-#                     paused = not paused
-#             if paused:
-#                 clock.tick(fps)
-
-#     print(f"Score médio: {np.mean(scores):.2f}, Desvio padrão: {np.std(scores):.2f}, Tempo: {time.time() - start_time:.1f}s")
-#     pygame.quit()

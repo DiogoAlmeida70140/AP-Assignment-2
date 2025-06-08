@@ -1,6 +1,6 @@
 #from train import *
 from snake_game import SnakeGame
-from train import *
+from Task2.train_task2 import *
 
 def id_from_env(env):
     """
