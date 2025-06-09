@@ -6,15 +6,25 @@ import numpy as np
 import time
 
 def random_policy():
-    """Selects a random action from {-1, 0, 1}."""
+    """
+    Selects a random action from {-1, 0, 1}.
+    """
     return random.choice([-1, 0, 1])
 
 
 def manhattan(a, b):
+    """
+    Returns the Manhattan distance between two points a and b.
+    """
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 ########################## A* Pathfinding with A* Search Algorithm ##########################
 def astar_path(head, apple, snake_body, width, height, border):
+    """
+    Finds a path from head to apple using the A* search algorithm.
+    Takes into account snake body and borders as obstacles.
+    Returns a list of (y, x) positions from head to apple, or None if no path exists.
+    """
     rows = height + 2 * border
     cols = width + 2 * border
     occupied = [[False] * cols for _ in range(rows)]
@@ -33,7 +43,7 @@ def astar_path(head, apple, snake_body, width, height, border):
     goal = (ay + border, ax + border)
 
     open_set = []
-    heapq.heappush(open_set, (0 + manhattan(start, goal), 0, start, [head]))  # path inicia com [head]
+    heapq.heappush(open_set, (0 + manhattan(start, goal), 0, start, [head]))
 
     visited = set()
 
@@ -41,7 +51,7 @@ def astar_path(head, apple, snake_body, width, height, border):
         _, cost, current, path = heapq.heappop(open_set)
 
         if current == goal:
-            return path  # já está na ordem correta
+            return path  
 
         if current in visited:
             continue
@@ -62,46 +72,42 @@ def astar_path(head, apple, snake_body, width, height, border):
                     ))
 
     return None
+
 ########################## Breadth-First Search (BFS) Pathfinding ##########################
 def bfs_path(head, apple, snake_body, width, height, border):
     """
-    BFS para encontrar o caminho mais curto de `head` até `apple`, evitando snake_body e border.
-    - head: tuplo (y_head, x_head)
-    - apple: tuplo (y_apple, x_apple)
-    - snake_body: lista de (y,x) do corpo (inclui a cabeça em snake_body[0], mas vamos tratar a cabeça como livre logo no início).
-    - width, height: dimensões da região livre (excluindo border)
-    - border: número de camadas de border cinzenta em torno do mapa.
-    Retorna: lista de tuplos (y,x) incluindo head e apple. Ex: [(y_head,x_head), (y1,x1), …, (y_apple,x_apple)].
-             Se não existir caminho, retorna None.
+    Finds the shortest path from head to apple using Breadth-First Search (BFS).
+    Avoids the snake body and borders.
+    Returns a list of (y, x) positions from head to apple, or None if no path exists.
     """
 
-    # 1) Constrói uma grelha 2D booleana “livre ou não” (com border ignorado/incluído)
-    # A grelha interna começa (border, border) a (border+height-1, border+width-1)
+    # 1) Construct a boolean “free or not” 2D grid (with border ignored/included)
+    # The inner grid starts (border, border) at (border+height-1, border+width-1)
     rows = height + 2 * border
     cols = width + 2 * border
 
-    # Cria matriz “ocupada = True” sempre que for parte do corpo ou border.
+    # Creates “occupied = True” array whenever it is part of body or border.
     occupied = [[False]*cols for _ in range(rows)]
-    # Marca border como ocupada
+    # Mark border as occupied
     for i in range(rows):
         for j in range(cols):
             if i < border or i >= border+height or j < border or j >= border+width:
                 occupied[i][j] = True
 
-    # Marca cada segmento da cobra como ocupado
-    # (Inclui a cabeça; mas vamos supor que podemos “mover a cabeça” para si mesma no primeiro passo)
+    # Mark each segment of the snake as occupied
+    # (Includes the head; but let's assume we can "move the head" to itself in the first step)
     for (cy, cx) in snake_body:
         occupied[cy + border][cx + border] = True
 
-    # Calcular coordenadas “globais” (com border deslocado)
+    # Calculate “global” coordinates (with offset edge)
     hy, hx = head
     ay, ax = apple
     start = (hy + border, hx + border)
     goal = (ay + border, ax + border)
 
-    # 2) BFS normal em grid 4-conectado
+    #2) Normal BFS on 4-connected grid
     queue = deque([start])
-    visited = {start: None}  # dicionário de “pai” para reconstruir o caminho
+    visited = {start: None} 
 
     while queue:
         curr = queue.popleft()
@@ -109,7 +115,6 @@ def bfs_path(head, apple, snake_body, width, height, border):
             break
 
         y, x = curr
-        # Quatro vizinhos ortogonais
         for dy, dx in [(-1,0),(1,0),(0,-1),(0,1)]:
             ny, nx = y + dy, x + dx
             if 0 <= ny < rows and 0 <= nx < cols:
@@ -117,57 +122,58 @@ def bfs_path(head, apple, snake_body, width, height, border):
                     visited[(ny,nx)] = curr
                     queue.append((ny,nx))
 
-    # Se não “visitou” goal, não há caminho
+    # If you didn't "visit" the goal, there's no way
     if goal not in visited:
         return None
 
-    # Reconstrói o caminho de trás para a frente
+    # Reconstructs the path backwards
     path = []
     node = goal
     while node is not None:
-        # Converte de volta para coordenadas sem border (subtraindo border)
+        # Convert back to borderless coordinates (subtracting border)
         py, px = node
         path.append((py - border, px - border))
         node = visited[node]
 
     path.reverse()
-    return path  # ex: [(y_head,x_head), (y1,x1), …, (y_apple,x_apple)]
+    return path  
 
 path = []
 
 def reset_path():
+    """
+    Resets the global path list used in heuristic policy.
+    """
     global path
     path=[]
 
-
 def heuristic_policy(env, pathfind="bfs"):
     """
-    Heuristic policy to move the snake toward the apple using BFS or a one-step look-ahead.
-    Args:
-        env: SnakeGame environment instance
-    Returns:
-        Action (-1, 0, 1) for left, straight, or right
+    Heuristic policy to control the snake using either BFS or A*.
+    Returns an action (-1, 0, 1) based on the next desired direction.
+    If no path is found, performs a safe one-step look-ahead to avoid collisions.
     """
     global path
     score, apples, head, tail, direction = env.get_state()
     if not apples:
         return 0
-    apple = apples[0]
+
+    apple = min(apples, key=lambda a: manhattan(head, a))
     hy, hx = head
     ay, ax = apple
 
-    # 1) Usa BFS ou A* para encontrar o caminho mais curto até à maçã
     pathfinder = bfs_path if pathfind == "bfs" else astar_path
     if path is None or len(path) == 0:
         path = pathfinder(head, apple, [head] + tail, env.width, env.height, env.border)
         if path is not None:
-            path.pop(0)  # Remove o head do início do caminho
+            path.pop(0)  # Remove the head from the beginning of the path
 
     if path is not None and len(path) >= 1:
-        # O segundo nó de path é a próxima célula para onde nos devemos mover
+        # The second path node is the next cell we should move to
         next_cell = path.pop(0)
         ny, nx = next_cell
-        # Calcula “direção desejada” com base na diferença entre head e next_cell
+        # Calculate “desired direction” based on the difference between head and next_cell
+        # If head=(hy,hx) and next_cell=(ny,nx), then:
         if ny < hy:
             desired = 0  # N
         elif ny > hy:
@@ -177,19 +183,14 @@ def heuristic_policy(env, pathfind="bfs"):
         else:
             desired = 3  # W
 
-        # Converte desired em action = {-1, 0, 1} baseando-se em “direction”
-        diff = (desired - direction) % 4  # Normalize to [0, 1, 2, 3]
-        if diff == 0:
-            action = 0  # Continue straight
-        elif diff == 1 or diff == 3:
-            action = 1 if diff == 1 else -1  # Turn right (diff=1) or left (diff=3)
-        else:
-            action = 0  # Opposite direction (diff=2), default to straight
+        # Convert desired to action = {-1,0,1} based on “direction”
+        action = ((desired - direction + 2) & 3) - 2
         return action
 
-    # 2) Se não existir caminho via BFS/A* (path is None), volta ao “look-ahead” de 1 passo:
-    #    tenta a ação que evita colisões no próximo movimento
+    
     hy, hx = head
+    # Replace original “desired direction” action previously used (point to fruit) 
+    # Reuse previous logic for “desired” and “diff”
     if ay < hy:
         desired = 0
     elif ay > hy:
@@ -199,15 +200,9 @@ def heuristic_policy(env, pathfind="bfs"):
     else:
         desired = 3
 
-    diff = (desired - direction) % 4
-    if diff == 0:
-        action = 0
-    elif diff == 1 or diff == 3:
-        action = 1 if diff == 1 else -1
-    else:
-        action = 0  # Default to straight if opposite direction
+    action = ((desired - direction + 2) & 3) - 2
 
-    # Simula “ver qual a célula seguinte” se usares action
+    # Simulates “see which cell next” if using action
     nd = (direction + action) % 4
     ty, tx = hy, hx
     if nd == 0:
@@ -219,7 +214,7 @@ def heuristic_policy(env, pathfind="bfs"):
     else:
         tx -= 1
 
-    # Se colidir de imediato, procura ação alternativa menos pior
+    # If it collides immediately, seeks least worst alternative action
     if ty < 0 or ty >= env.height or tx < 0 or tx >= env.width or (ty, tx) in tail:
         for alt in [-1, 0, 1]:
             nd2 = (direction + alt) % 4
@@ -239,6 +234,11 @@ def heuristic_policy(env, pathfind="bfs"):
     return action
 
 def play_with_heuristic(env, scale=10, fps=5, num_episodes=10):
+    """
+    Plays the Snake game using a heuristic policy (A* or BFS) with Pygame rendering.
+    Handles display, pause, and quit events.
+    Outputs score per episode and statistics at the end.
+    """
     pygame.init()
     window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
     screen = pygame.display.set_mode(window_size)

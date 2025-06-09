@@ -24,7 +24,7 @@ def get_model(env, force_train=False, file_name=''):
         except:
             print("Erro ao dar load do modelo, iniciando treino...")
     
-    model = train(env)
+    model = train(env, file_name)
     model.save(file_name)
     print("Modelo salvo em:" + file_name)
         
@@ -42,18 +42,14 @@ if __name__ == '__main__':
         
     board_size = (14, 14)
     border = 1
-    env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0)
+    env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0, food_amount=1)
 
-    model = get_model(env, force_train=False, file_name='m3.pth')
+    model = get_model(env, force_train=True, file_name='Model2.pth')
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
-        
     # model.eval()
 
-    # Mostra o modelo com a heuristica
-    #play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
-    # # # 3) Avalia e mostra as top 3 partidas entre 5000
-    #evaluate_and_show_best(model, env, num_eval_episodes=10, top_k=3, scale=10, slow_fps=5)
-    play(model, env, num_eval_episodes=100, top_k=10)
+    # play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
+    evaluate_and_show(env, model, top_k=5)
     

@@ -1,4 +1,3 @@
-from collections import deque
 import numpy as np
 import torch
 import random
@@ -14,25 +13,29 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def preprocess(state):
     """
-    Pré-processa o estado da imagem para a rede neural.
-    Converte para grayscale e garante que esteja no intervalo [0, 1].
-    Assume que o input já está no intervalo [0, 1] (float32).
+    Preprocesses the environment image state.
+    Converts it to grayscale, normalizes, and adds channel dimension.
     """
-    # state_raw é (H, W, 3) float32 no intervalo [0, 1]
-    # Para cv2.cvtColor, precisamos de uint8 ou de ter certeza que o tipo é float32 e o cv2 aceita
-    # Por segurança, vamos converter para uint8 para cv2.cvtColor, e depois normalizar
+    # state_raw is (H, W, 3) float32 in range [0, 1]
+    # For cv2.cvtColor, we need uint8 or make sure the type is float32 and cv2 accepts it
+    # To be safe, let's cast to uint8 for cv2.cvtColor, and then normalize
     state_uint8 = (state * 255).astype(np.uint8)
-    state_gray = cv2.cvtColor(state_uint8, cv2.COLOR_RGB2GRAY) # Correção aqui
-    state_gray = state_gray / 255.0 # Normaliza de volta para [0, 1]
+    state_gray = cv2.cvtColor(state_uint8, cv2.COLOR_RGB2GRAY) 
+    state_gray = state_gray / 255.0 # Normalize back to [0, 1]
     return np.expand_dims(state_gray, axis=0) # (1, H, W)
 
+
 def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
+    """
+    Selects an action using the epsilon-greedy policy.
+    Optionally prints Q-values at regular intervals.
+    """
     if random.random() < epsilon:
         return random.choice([-1, 0, 1]), step_count + 1
     state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
     with torch.no_grad():
         q_values = model(state_tensor)
-    if print_qvalues and step_count % 100 == 0:  # Imprime a cada 100 passos
+    if print_qvalues and step_count % 100 == 0: 
         print(f"Step {step_count}, Q-values: {q_values.tolist()}")
     return torch.argmax(q_values).item() - 1, step_count + 1
 
@@ -40,12 +43,12 @@ def get_action(model, state, epsilon, step_count=0, print_qvalues=False):
 def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
           epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9995,
           learning_rate=0.00015, gamma=0.99, max_train_time=60):
-    # Modelo principal (online network)
+    """
+    Trains a neural network using Deep Q-Learning (DQN) with an epsilon-greedy policy.
+    Saves training metrics and the best-performing model based on score.
+    """
+    # Main model
     model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
-    # Target Network - CÓPIA IDÊNTICA DA ONLINE NETWORK
-    target_model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
-    target_model.load_state_dict(model.state_dict())  # Inicializa a target com os pesos da online
-    target_model.eval()  # Coloca a target network em modo de avaliação (sem updates de gradiente)
 
     trainer = QTrainer(model, lr=learning_rate, gamma=gamma)
 
@@ -58,10 +61,10 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
     metrics = []
     losses = []
 
-    # Variável para contar os passos globais e atualizar a target network
+    # Variable to count global steps and update the target network
     global_step_counter = 0
 
-    print(f"A treinar no dispositivo: {device}...")
+    print(f"Training on the device: {device}...")
     start_time = time.time()
 
     for episode in range(num_episodes):
@@ -73,7 +76,7 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
         episode_losses = []
 
         while not done and steps_in_episode < max_steps_per_episode:
-            # Seleciona a ação (epsilon-greedy)
+            # Select the action (epsilon-greedy)
             if random.random() < epsilon:
                 action = random.choice([-1, 0, 1])
             else:
@@ -82,15 +85,15 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
                     prediction = model(state_tensor)
                 action = [-1, 0, 1][torch.argmax(prediction).item()]
 
-            # Executa a ação
+            # Execute the action
             next_state_raw, reward, done, info = env.step(action)
             preprocessed_next_state = preprocess(next_state_raw)
 
-            # Chamar o train_step com os Q_current_action e q_targets
+            # Call train_step with Q_current_action and q_targets
             loss = trainer.train_step(preprocessed_state, action + 1, reward, preprocessed_next_state, done)
             episode_losses.append(loss)
 
-            # Atualiza o estado
+            # Update status
             preprocessed_state = preprocessed_next_state
             score += reward
             steps_in_episode += 1
@@ -136,22 +139,29 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
     return model
 
 def save_metrics(metrics, losses, file_name):
-    # Salvando métricas + losses em CSV
-    with open(f'./Task2/{file_name}_train_metrics.csv', 'w', newline='') as f:
+    """
+    Saves training metrics (episode, score, epsilon, loss) to a CSV file.
+    Flags whether heuristics were used during training.
+    """
+    # Saving metrics + losses in CSV
+    with open(f'./Task1/{file_name}_train_metrics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
-        # Adiciona coluna usada_heuristic
+        # Add column used heuristic
         writer.writerow(['episode', 'score', 'epsilon', 'avg_loss', 'used_heuristic'])
         for i in range(len(metrics)):
             # metrics[i] = (ep, total_reward, epsilon)
-            # losses[i] = avg_loss
-            # Precisamos saber se, naquele episódio, usamos heurística.
-            # Uma forma simples: se o último episódio usou heurística ao menos uma vez → True.
-            # Para simplificar: considere que “usou heurística” se ep<=200.
+            # loss[i] = avg_loss
+            # We need to know if, in that episode, we used heuristics.
+            # A simple way: if the last episode used heuristics at least once → True.
+            # To simplify: consider that you “used heuristics” if ep<=200.
             used = (metrics[i][0] <= 200)
             writer.writerow([metrics[i][0], metrics[i][1], metrics[i][2], losses[i], used])
     return
 
 def show_metrics(metrics, losses, file_name):
+    """
+    Generates and saves line plots of score, epsilon, and average loss over training episodes.
+    """
     # Plot charts (score, epsilon, loss)
     epis = [m[0] for m in metrics]
     scores = [m[1] for m in metrics]
@@ -163,7 +173,7 @@ def show_metrics(metrics, losses, file_name):
     plt.ylabel('Score')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'./Task2/images/{file_name}_train_score.png')
+    plt.savefig(f'./Task1/images/{file_name}_train_score.png')
     plt.close()
 
     plt.figure(figsize=(8,4))
@@ -172,7 +182,7 @@ def show_metrics(metrics, losses, file_name):
     plt.ylabel('Epsilon')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'./Task2/images/{file_name}_train_epsilon.png')
+    plt.savefig(f'./Task1/images/{file_name}_train_epsilon.png')
     plt.close()
 
     plt.figure(figsize=(8,4))
@@ -181,36 +191,24 @@ def show_metrics(metrics, losses, file_name):
     plt.ylabel('Loss')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'./Task2/images/{file_name}_train_loss.png')
+    plt.savefig(f'./Task1/images/{file_name}_train_loss.png')
     plt.close()
     return
 
 def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
     """
-    Carrega um modelo a partir de model_path, avalia em múltiplos episódios e mostra os melhores jogos em Pygame.
-
-    Args:
-        model_path (str): Caminho para o arquivo do modelo (ex.: './Task1/model/model.pth').
-        width (int): Largura do tabuleiro do jogo.
-        height (int): Altura do tabuleiro do jogo.
-        food_amount (int): Quantidade de comida no tabuleiro.
-        border (int): Tamanho da borda ao redor do tabuleiro.
-        grass_growth (float): Taxa de crescimento da grama.
-        max_grass (float): Nível máximo de grama.
-        num_eval_episodes (int): Número de episódios para avaliação.
-        top_k (int): Número de melhores episódios a serem exibidos.
-        scale (int): Fator de escala para a janela do Pygame.
-        slow_fps (int): FPS para a reprodução lenta.
+    Evaluates the trained model over multiple episodes and visualizes the top-performing ones using Pygame.
+    Displays top_k episodes with highest step counts.
     """
 
-    # Avaliar o modelo em múltiplos episódios
-    results = []  # Lista de (pontuação final, [frame0, frame1, ...])
+    # Evaluate the model across multiple episodes
+    results = []  # List of (final score, [frame0, frame1, ...])
     for ep in range(1, num_eval_episodes + 1):
         raw_frames = []
         raw_state, _, done, _ = env.reset()
 
         if ep == 1:
-            # Imprimir os Q-values do estado inicial
+            # Print the Q values ​​of the initial state
             state_tensor = preprocess(raw_state)
             with torch.no_grad():
                 qs = model(torch.tensor(state_tensor, dtype=torch.float32).unsqueeze(0).to(device))
@@ -231,14 +229,14 @@ def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
         results.append((total_reward, raw_frames))
         print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {step_count}")
 
-    # Selecionar os top_k melhores episódios
+    # Select top_k best episodes
     results.sort(key=lambda x: len(x[1]), reverse=True)
     top_results = results[:top_k]
     print(f"\nTop {top_k} resultados (score, n_passos):")
     for idx, (sc, frames) in enumerate(top_results, start=1):
         print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames)-1}")
 
-    # Mostrar os melhores jogos em Pygame
+    # Show the best Pygame games
     pygame.init()
     window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
     screen = pygame.display.set_mode(window_size)
@@ -260,15 +258,20 @@ def play(model, env, num_eval_episodes=500, top_k=3, scale=10, slow_fps=5):
             pygame.display.flip()
             clock.tick(slow_fps)
 
-        # Pausa de 1 segundo entre partidas
+        # 1 second pause between matches
         time.sleep(1)
 
     print("Fim da reprodução das melhores partidas.")
     pygame.quit()
 
 def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top_k=10, fps=10, scale=10):
-    # Avaliar o modelo em múltiplos episódios
-    results = []  # Lista de (pontuação final, [frame0, frame1, ...])
+    """
+    Evaluates the model's performance over multiple episodes.
+    Displays the top_k episodes with highest scores using Pygame.
+    Stops episodes that remain idle (no rewards) for too long.
+    """
+    # Evaluate the model across multiple episodes
+    results = []  # List of (final score, [frame0, frame1, ...])
     for ep in range(1, num_eval_episodes + 1):
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
@@ -276,7 +279,7 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
         done = False
         total_reward = 0
         steps = 0
-        idle_steps = 0  # Contador de passos sem progresso
+        idle_steps = 0  # Step counter with no progress
         while not done and idle_steps < idle_tolerance:
             state_tensor = torch.tensor(preprocessed_state, dtype=torch.float32).unsqueeze(0).to(device)
             with torch.no_grad():
@@ -294,14 +297,14 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
         results.append((total_reward, raw_frames))
         print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {steps}")
 
-    # Selecionar os top_k melhores episódios
+    # Select top_k best episodes
     results.sort(key=lambda x: x[0], reverse=True)
     top_results = results[:top_k]
     print(f"\nTop {top_k} resultados (score, n_passos):")
     for idx, (sc, frames) in enumerate(top_results, start=1):
         print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames) - 1}")
 
-    # Mostrar os melhores jogos em Pygame
+    # Show the best Pygame games
     pygame.init()
     window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
     screen = pygame.display.set_mode(window_size)
@@ -323,7 +326,6 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
             pygame.display.flip()
             clock.tick(fps)
 
-        # Pausa de 1 segundo entre partidas
         time.sleep(1)
 
     print("Fim da reprodução das melhores partidas.")

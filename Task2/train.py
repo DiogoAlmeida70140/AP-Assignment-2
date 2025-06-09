@@ -1,5 +1,3 @@
-from collections import deque
-import os
 import numpy as np
 import torch
 import random
@@ -7,35 +5,34 @@ import time
 import csv
 from model import CNN_QNet, QTrainer
 import matplotlib.pyplot as plt
-import cv2
 import pygame
 from policies import *
-from utils import preprocess
-# Importa o ReplayBuffer
 from replay_buffer import ReplayBuffer 
-
+from utils import preprocess
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# --- Treinamento --------------------------------------------------------
 def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
           epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9995,
-          batch_size=64, learning_rate=0.00015, gamma=0.99,
-          buffer_capacity=10000, num_warmup_steps=0,
-          target_update_freq=100, max_train_time = 2*3600):
-
-    # Modelo principal (online network)
+          batch_size=64, learning_rate=0.0001, gamma=0.99,
+          buffer_capacity=10000, num_warmup_steps=5000,
+          target_update_freq=100, max_train_time = 2*3600,
+          ):
+    """
+    Train the DQN agent using CNN and replay buffer.
+    """
+    # Main model 
     model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
-    # Target Network - CÓPIA IDÊNTICA DA ONLINE NETWORK
+    # Target Network - IDENTICAL COPY 
     target_model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
-    target_model.load_state_dict(model.state_dict()) # Inicializa a target com os pesos da online
-    target_model.eval() # Coloca a target network em modo de avaliação (sem updates de gradiente)
+    target_model.load_state_dict(model.state_dict()) # Initialize the target with the online weights
+    target_model.eval() # Put the target network into evaluation mode (no gradient updates)
 
     trainer = QTrainer(model, lr=learning_rate, gamma=gamma)
     
     # Replay Buffer
     replay_buffer = ReplayBuffer(capacity=buffer_capacity)
     
-    # Popula o buffer inicialmente (warm-start)
+    # Populate the buffer initially (warm-start)
     replay_buffer.populate(env, heuristic_policy, num_warmup_steps)
 
     epsilon = epsilon_start
@@ -47,7 +44,7 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
     metrics = []
     losses = []
     
-    # Variável para contar os passos globais e atualizar a target network
+    # Variable to count global steps and update the target network
     global_step_counter = 0 
     
     print(f"A treinar no dispositivo: {device}...")
@@ -62,7 +59,7 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
         episode_losses = []
 
         while not done and steps_in_episode < max_steps_per_episode:
-            # Seleciona a ação (epsilon-greedy)
+            # Select the action (epsilon-greedy)
             if random.random() < epsilon:
                 action = random.choice([-1, 0, 1])
             else:
@@ -71,52 +68,51 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
                     prediction = model(state_tensor)
                 action = [-1, 0, 1][torch.argmax(prediction).item()]
 
-            # Executa a ação
             next_state_raw, reward, done, info = env.step(action)
             preprocessed_next_state = preprocess(next_state_raw)
 
-            # Armazena a transição no replay buffer
+            # Store the transition in the replay buffer
             action_idx = action + 1
             replay_buffer.add(preprocessed_state, action_idx, reward, preprocessed_next_state, done)
 
-            # Atualiza o estado
+            # Update status
             preprocessed_state = preprocessed_next_state
             score += reward
             steps_in_episode += 1
             global_step_counter += 1
 
-            # Treina o modelo se houver experiências suficientes no buffer e a cada 4 passos (para eficiência)
+            # Train the model if there are enough experiences in the buffer and every 4 steps (for efficiency)
             if len(replay_buffer) > batch_size and global_step_counter % 4 == 0:
-                # Amostra um batch do buffer
+                # Sample a batch from the buffer
                 states_batch, actions_batch, rewards_batch, next_states_batch, dones_batch = replay_buffer.sample(batch_size)
                 
-                # Converte para tensores PyTorch
+                # Convert to PyTorch tensors
                 states_batch = torch.tensor(states_batch, dtype=torch.float32).to(device)
                 actions_batch = torch.tensor(actions_batch, dtype=torch.int64).to(device)
                 rewards_batch = torch.tensor(rewards_batch, dtype=torch.float32).to(device)
                 next_states_batch = torch.tensor(next_states_batch, dtype=torch.float32).to(device)
                 dones_batch = torch.tensor(dones_batch, dtype=torch.bool).to(device)
 
-                # Calcular Q-values para o estado atual (online network)
+                # Calculate Q-values ​​for the current state (online network)
                 q_values_online = model(states_batch)
                 q_current_action = q_values_online.gather(1, actions_batch.unsqueeze(1)).squeeze(1)
 
-                # Calcular Q-values para o próximo estado (target network)
+                # Calculate Q-values ​​for the next state (target network)
                 with torch.no_grad():
                     q_next_state = target_model(next_states_batch).max(1)[0]
 
-                # Calcular os alvos Q-values
+                # Calculate target Q-values
                 q_targets = rewards_batch + trainer.gamma * q_next_state * (~dones_batch)
 
-                # Chamar o train_step com os Q_current_action e q_targets
+                # Call train_step with Q_current_action and q_targets
                 loss = trainer.train_step(q_current_action, q_targets)
                 episode_losses.append(loss)
             
-            # Atualiza a Target Network a cada 'target_update_freq' passos globais
+            # Updates Target Network every 'target_update_freq' global steps
             if global_step_counter % target_update_freq == 0:
                 target_model.load_state_dict(model.state_dict())
             
-        # Reduz epsilon
+        # Reduce epsilon
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
 
         total_scores.append(score)
@@ -155,22 +151,29 @@ def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
     return model
 
 def save_metrics(metrics, losses, file_name):
-    # Salvando métricas + losses em CSV
+    """
+    Saves training metrics (episode, score, epsilon, loss) to a CSV file.
+    Flags whether heuristics were used during training.
+    """
+    # Saving metrics + losses in CSV
     with open(f'./Task2/{file_name}_train_metrics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
-        # Adiciona coluna usada_heuristic
+        # Add column used heuristic
         writer.writerow(['episode', 'score', 'epsilon', 'avg_loss', 'used_heuristic'])
         for i in range(len(metrics)):
             # metrics[i] = (ep, total_reward, epsilon)
-            # losses[i] = avg_loss
-            # Precisamos saber se, naquele episódio, usamos heurística. 
-            # Uma forma simples: se o último episódio usou heurística ao menos uma vez → True. 
-            # Para simplificar: considere que “usou heurística” se ep<=200.
+            # loss[i] = avg_loss
+            # We need to know if, in that episode, we used heuristics.
+            # A simple way: if the last episode used heuristics at least once → True.
+            # To simplify: consider that you “used heuristics” if ep<=200.
             used = (metrics[i][0] <= 200)
             writer.writerow([metrics[i][0], metrics[i][1], metrics[i][2], losses[i], used])
     return
 
 def show_metrics(metrics, losses, file_name):
+    """
+    Generates and saves line plots of score, epsilon, and average loss over training episodes.
+    """
     # Plot charts (score, epsilon, loss)
     epis = [m[0] for m in metrics]
     scores = [m[1] for m in metrics]
@@ -205,8 +208,11 @@ def show_metrics(metrics, losses, file_name):
     return
 
 def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top_k=10, fps=10, scale=10):
-    # Avaliar o modelo em múltiplos episódios
-    results = []  # Lista de (pontuação final, [frame0, frame1, ...])
+    """
+    Evaluate the model and display top episodes with Pygame.
+    """
+    # Evaluate the model across multiple episodes
+    results = []  # List of (final score, [frame0, frame1, ...])
     for ep in range(1, num_eval_episodes + 1):
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
@@ -214,7 +220,7 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
         done = False
         total_reward = 0
         steps = 0
-        idle_steps = 0  # Contador de passos sem progresso
+        idle_steps = 0  # Step counter with no progress
         while not done and idle_steps < idle_tolerance:
             state_tensor = torch.tensor(preprocessed_state, dtype=torch.float32).unsqueeze(0).to(device)
             with torch.no_grad():
@@ -232,14 +238,14 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
         results.append((total_reward, raw_frames))
         print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {steps}")
 
-    # Selecionar os top_k melhores episódios
+    # Select top_k best episodes
     results.sort(key=lambda x: x[0], reverse=True)
     top_results = results[:top_k]
     print(f"\nTop {top_k} resultados (score, n_passos):")
     for idx, (sc, frames) in enumerate(top_results, start=1):
         print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames) - 1}")
 
-    # Mostrar os melhores jogos em Pygame
+    # Show the best Pygame games
     pygame.init()
     window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
     screen = pygame.display.set_mode(window_size)
@@ -261,7 +267,6 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
             pygame.display.flip()
             clock.tick(fps)
 
-        # Pausa de 1 segundo entre partidas
         time.sleep(1)
 
     print("Fim da reprodução das melhores partidas.")

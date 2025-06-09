@@ -1,4 +1,3 @@
-# model.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +8,10 @@ class CNN_QNet(nn.Module):
     model_folder_path = './Task2/model'
 
     def __init__(self, input_shape=(1, 32, 32), num_actions=3):
+        """
+        Initialize the CNN model with convolutional, pooling, and fully connected layers.
+        Automatically computes the flatten size for the first fully connected layer.
+        """
         super().__init__()
         c, h, w = input_shape  # c=channels, h=height, w=width
 
@@ -33,6 +36,9 @@ class CNN_QNet(nn.Module):
         self.fc2 = nn.Linear(256, num_actions)
 
     def forward(self, x):
+        """
+        Forward pass of the CNN model through conv, pool, dropout, and FC layers.
+        """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool(x)
         x = F.relu(self.bn2(self.conv2(x)))
@@ -44,12 +50,18 @@ class CNN_QNet(nn.Module):
         return self.fc2(x)
 
     def save(self, file_name='model.pth'):
+        """
+        Save the model parameters to disk.
+        """
         os.makedirs(CNN_QNet.model_folder_path, exist_ok=True)
         file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
 
     @staticmethod
     def load(env, file_name='model.pth'):
+        """
+        Load the model parameters from disk using the environment to define input shape.
+        """
         file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         if not os.path.exists(file_name):
             raise FileNotFoundError(f"Model file {file_name} does not exist.")
@@ -61,6 +73,10 @@ class CNN_QNet(nn.Module):
 
 class QTrainer:
     def __init__(self, model, lr, gamma,target_model=None):
+        """
+        Initialize the Q-learning trainer with optimizer and loss function.
+        Supports optional target model for more stable training.
+        """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
         self.target_model = target_model
@@ -71,14 +87,8 @@ class QTrainer:
     
     def train_step(self, q_current_action, q_targets): # <- MODIFICADO: Agora aceita Q-values atuais e targets
         """
-        Executa um passo de treinamento para o modelo Q-Network.
-        Recebe os Q-values previstos para as ações tomadas e os Q-targets.
-
-        Args:
-            q_current_action (torch.Tensor): Q-values previstos pelo modelo online
-                                             para as ações realmente tomadas (batch_size).
-            q_targets (torch.Tensor): Q-targets calculados usando a target network
-                                      e a recompensa (batch_size).
+        Perform a single Q-learning update step using given transition data.
+        Calculates the loss and updates the model.
         """
         # Zerar os gradientes do otimizador
         self.optimizer.zero_grad()

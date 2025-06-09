@@ -1,0 +1,137 @@
+########################################################################################### Decaimento Linear ######################################################################################
+############################################################################################## Model 1 #############################################################################################
+
+metric_val = temperature = max(temperature_end, temperature_start - temperature_decay * episode)
+
+Model1 - env, 
+        num_episodes=20000,                                                 2000- Episódio 1991/20000 | Score: -0.23 | Recorde: 1.82 | Temperature: 0.40 | Média Score (100): -1.01 | Tempo: 70.0s
+                                                                                    Q-values: [89867.8515625, 92126.8046875, 91000.8515625]
+        max_steps_per_episode=1000,                                         5000- Episódio 4991/20000 | Score: -0.74 | Recorde: 1.97 | Temperature: 0.01 | Média Score (100): -1.00 | Tempo: 169.3s
+                                                                                    Q-values: [-71.5867919921875, 1786.9237060546875, 1053.170166015625]
+        exploration_strategy='boltzmann',                                   10000-Episódio 9991/20000 | Score: -1.61 | Recorde: 1.97 | Temperature: 0.01 | Média Score (100): -1.00 | Tempo: 410.6s
+                                                                                    Q-values: [-1.078139066696167, -0.4547273516654968, -4.738328456878662]
+        epsilon_start=1.0,                                                  15000- Episódio 15491/20000 | Score: -0.61 | Recorde: 1.97 | Temperature: 0.01 | Média Score (100): -1.00 | Tempo: 475.3s
+                                                                                    Q-values: [-0.12869586050510406, -0.14224262535572052, -0.1254720836877823]
+        epsilon_end=0.005,                                                  20000- Episódio 19991/20000 | Score: -0.48 | Recorde: 1.97 | Temperature: 0.01 | Média Score (100): -1.00 | Tempo: 627.1s
+        epsilon_decay=0.9995,
+        temperature_start=1.0, 
+        temperature_end=0.01, 
+        temperature_decay=0.9995,
+        batch_size=64, 
+        learning_rate=0.0001, 
+        gamma=0.99,
+        buffer_capacity=10000, 
+        num_warmup_steps=5000,
+        target_update_freq=100
+
+self, width, height, food_amount=2,border = 0, grass_growth = 0,max_grass = 0
+
+def step(self, action):        
+        """
+        move snake/game one step 
+        action can be -1 (turn left), 0 (continue), 1 (turn rignt)
+        """
+        direction = int(action)
+        assert -1 <= direction <= 1
+        self.direction += direction
+        if self.direction < 0:
+            self.direction = 3
+        elif self.direction > 3:
+            self.direction = 0
+        self.grow_snake(self.direction)  # two steps: grow+remove last
+        if self.snake[0] in self.apples:
+            self.apples.remove(self.snake[0])
+            reward = 1
+            self.create_apples()  # new apple
+        else:
+            self.snake.pop()
+            self.check_collisions()
+            if self.done:
+                reward = -1
+            else:
+                reward = -0.005
+
+        if reward != -1:
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            reward -= (manhattan - self.last_manhattan) * 0.1
+            self.last_manhattan = manhattan
+
+            x, y = self.snake[0]
+            reward += self.grass[x, y]
+            self.grass[x, y] = 0
+            self.score += reward
+            self.grass += self.grass_growth
+            self.grass[self.grass > self.max_grass] = self.max_grass
+
+        return self.board_state(), reward, self.done, {'score': self.score}
+
+########################################################################################### Decaimento Linear ######################################################################################
+############################################################################################## Model 2 #############################################################################################
+
+metric_val = temperature = temperature_end + (temperature_start - temperature_end) * np.exp(-temperature_decay * episode)
+
+Model2 - env, 
+        num_episodes=20000,                                                 Episódio 1991/20000 | Score: -0.84 | Recorde: 1.97 | Temperature: 0.55 | Média Score (100): -1.00 | Tempo: 79.3s
+                                                                                    Q-values: [88506.09375, 91508.296875, 89303.21875]
+        max_steps_per_episode=1000,                                         Episódio 4991/20000 | Score: -1.14 | Recorde: 2.24 | Temperature: 0.23 | Média Score (100): -1.01 | Tempo: 202.9s
+                                                                                    Q-values: [-636.186767578125, -160.07569885253906, -1257.2447509765625]
+        exploration_strategy='boltzmann',                                   10000-Episódio 9991/20000 | Score: -2.21 | Recorde: 2.60 | Temperature: 0.06 | Média Score (100): -1.02 | Tempo: 372.7s
+                                                                                    Q-values: [-2.380976438522339, -0.5289747714996338, -0.7591456174850464]
+        epsilon_start=1.0,                                                  15000- Episódio 14991/20000 | Score: -0.81 | Recorde: 2.60 | Temperature: 0.02 | Média Score (100): -0.99 | Tempo: 436.9s
+                                                                                    Q-values: [-0.019992729648947716, -0.09996043890714645, 0.09103130549192429]
+        epsilon_end=0.005,                                                  20000- Episódio 19991/20000 | Score: 0.32 | Recorde: 2.60 | Temperature: 0.01 | Média Score (100): -0.99 | Tempo: 597.1s
+        epsilon_decay=0.9995,
+        temperature_start=1.0, 
+        temperature_end=0.01, 
+        temperature_decay=0.9995,
+        batch_size=64, 
+        learning_rate=0.0001, 
+        gamma=0.99,
+        buffer_capacity=10000, 
+        num_warmup_steps=5000,
+        target_update_freq=100
+
+self, width, height, food_amount=2,border = 0, grass_growth = 0,max_grass = 0
+
+def step(self, action):        
+        """
+        move snake/game one step 
+        action can be -1 (turn left), 0 (continue), 1 (turn rignt)
+        """
+        direction = int(action)
+        assert -1 <= direction <= 1
+        self.direction += direction
+        if self.direction < 0:
+            self.direction = 3
+        elif self.direction > 3:
+            self.direction = 0
+        self.grow_snake(self.direction)  # two steps: grow+remove last
+        if self.snake[0] in self.apples:
+            self.apples.remove(self.snake[0])
+            reward = 1
+            self.create_apples()  # new apple
+        else:
+            self.snake.pop()
+            self.check_collisions()
+            if self.done:
+                reward = -1
+            else:
+                reward = -0.005
+
+        if reward != -1:
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            reward -= (manhattan - self.last_manhattan) * 0.1
+            self.last_manhattan = manhattan
+
+            x, y = self.snake[0]
+            reward += self.grass[x, y]
+            self.grass[x, y] = 0
+            self.score += reward
+            self.grass += self.grass_growth
+            self.grass[self.grass > self.max_grass] = self.max_grass
+
+        return self.board_state(), reward, self.done, {'score': self.score} 

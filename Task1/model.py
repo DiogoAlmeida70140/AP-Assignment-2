@@ -1,15 +1,17 @@
-# model.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import os
 
-
 class CNN_QNet(nn.Module):
     model_folder_path = './Task1/model'
 
     def __init__(self, input_shape=(1, 32, 32), num_actions=3):
+        """
+        Initialize the CNN model with convolutional, pooling, and fully connected layers.
+        Automatically computes the flatten size for the first fully connected layer.
+        """
         super().__init__()
         c, h, w = input_shape  # c=channels, h=height, w=width
 
@@ -34,6 +36,9 @@ class CNN_QNet(nn.Module):
         self.fc2 = nn.Linear(256, num_actions)
 
     def forward(self, x):
+        """
+        Forward pass of the CNN model through conv, pool, dropout, and FC layers.
+        """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool(x)
         x = F.relu(self.bn2(self.conv2(x)))
@@ -45,12 +50,18 @@ class CNN_QNet(nn.Module):
         return self.fc2(x)
 
     def save(self, file_name='model.pth'):
+        """
+        Save the model parameters to disk.
+        """
         os.makedirs(CNN_QNet.model_folder_path, exist_ok=True)
         file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
 
     @staticmethod
     def load(env, file_name='model.pth'):
+        """
+        Load the model parameters from disk using the environment to define input shape.
+        """
         file_name = os.path.join(CNN_QNet.model_folder_path, file_name)
         if not os.path.exists(file_name):
             raise FileNotFoundError(f"Model file {file_name} does not exist.")
@@ -61,6 +72,10 @@ class CNN_QNet(nn.Module):
 
 class QTrainer:
     def __init__(self, model, lr, gamma, target_model=None):
+        """
+        Initialize the Q-learning trainer with optimizer and loss function.
+        Supports optional target model for more stable training.
+        """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
         self.target_model = target_model
@@ -70,6 +85,10 @@ class QTrainer:
         self.criterion = nn.SmoothL1Loss()
 
     def train_step(self, state, action, reward, next_state, done):
+        """
+        Perform a single Q-learning update step using given transition data.
+        Calculates the loss and updates the model.
+        """
         # Convert to torch tensors
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
@@ -77,7 +96,7 @@ class QTrainer:
         reward = torch.tensor(reward, dtype=torch.float32).to(self.device)
 
 
-        if len(state.shape) == 3:  # single sample
+        if len(state.shape) == 3: 
             state = state.unsqueeze(0)
             next_state = next_state.unsqueeze(0)
             action = action.unsqueeze(0)

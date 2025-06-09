@@ -20,13 +20,13 @@ def get_model(env, force_train=False, file_name=''):
         try:
             return CNN_QNet.load(env, file_name).to(device)
         except FileNotFoundError:
-            print("Modelo não encontrado, iniciando treino...")
+            print("Model not found, starting training...")
         except:
-            print("Erro ao dar load do modelo, iniciando treino...")
+            print("Error loading the model, starting training...")
 
     model = train(env, file_name)
     model.save(file_name)
-    print("Modelo salvo em:" + file_name)
+    print("Model saved in:" + file_name)
 
     return model
 

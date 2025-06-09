@@ -38,3 +38,8 @@ To get started with this project, follow these steps to set up your environment:
    ```
    pip install -r requirements.txt
    ```
+
+4. **Run the line bellow to get torch to run on GPU (cuda)**
+   ```
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   ```

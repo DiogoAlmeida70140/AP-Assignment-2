@@ -413,4 +413,8 @@ def step(self, action):
 
 
 ############################################################################################### M10 ###############################################################################################
-m10 - 
+m10 -
+
+Episódio 2001/30000 | Score: -1.98 | Recorde: 1.67 | Epsilon: 0.67 | Média Score (100): -1.05 | Passos no episódio: 16 | Tempo Decorrido: 75.3s
+Episódio 5001/30000 | Score: -1.54 | Recorde: 2.26 | Epsilon: 0.37 | Média Score (100): -1.02 | Passos no episódio: 10 | Tempo Decorrido: 224.6s
+Episódio 10001/30000 | Score: -1.94 | Recorde: 2.55 | Epsilon: 0.14 | Média Score (100): -0.98 | Passos no episódio: 9 | Tempo Decorrido: 431.1s
