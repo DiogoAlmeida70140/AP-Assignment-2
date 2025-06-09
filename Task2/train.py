@@ -17,11 +17,11 @@ from replay_buffer import ReplayBuffer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Treinamento --------------------------------------------------------
-def train(env, num_episodes=50000, max_steps_per_episode=1000,
+def train(env, num_episodes=20000, max_steps_per_episode=1000,
           epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9998,
           batch_size=64, learning_rate=0.0001, gamma=0.99,
           buffer_capacity=10000, num_warmup_steps=5000,
-          target_update_freq=100):
+          target_update_freq=100,inject_interval=30, inject_amount=1000):
 
     # Modelo principal (online network)
     model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
@@ -52,6 +52,11 @@ def train(env, num_episodes=50000, max_steps_per_episode=1000,
     start_time = time.time()
 
     for episode in range(num_episodes):
+        
+        if (episode+1) % inject_interval == 0:
+            replay_buffer.populate(env, heuristic_policy, inject_amount)
+            #print(f">>> Injected {inject_amount} heuristic experiences at episode {episode}")
+            
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
         score = 0
