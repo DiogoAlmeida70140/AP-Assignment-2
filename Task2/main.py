@@ -48,12 +48,8 @@ if __name__ == '__main__':
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
-        
     # model.eval()
 
-    # Mostra o modelo com a heuristica
     # play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
-    # # # 3) Avalia e mostra as top 3 partidas entre 5000
-    #evaluate_and_show_best(model, env, num_eval_episodes=10, top_k=3, scale=10, slow_fps=5)
-    play(model, env, num_eval_episodes=100, top_k=10)
+    evaluate_and_show(env, model, top_k=5)
     

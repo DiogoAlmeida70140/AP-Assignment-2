@@ -280,8 +280,8 @@ m7 - env,                                            2000- Episódio 2001/30000 
     max_steps_per_episode=1000,                      10000- Episódio 10001/30000 | Score: 3.51 | Recorde: 8.30 | Epsilon: 0.14 | Média Score (100): 0.56 | Passos no episódio: 185 | Tempo Decorrido: 641.2s
     epsilon_start=1.0,                               15000- Episódio 15001/30000 | Score: 6.58 | Recorde: 11.98 | Epsilon: 0.05 | Média Score (100): 1.33 | Passos no episódio: 132 | Tempo Decorrido: 1585.4s
     epsilon_end=0.005,                               20000- Episódio 20001/30000 | Score: 2.18 | Recorde: 18.45 | Epsilon: 0.02 | Média Score (100): 4.93 | Passos no episódio: 49 | Tempo Decorrido: 3312.3s
-    epsilon_decay=0.9998,                            25000-
-    batch_size=64,                                   30000-
+    epsilon_decay=0.9998,                            25000- Episódio 25001/30000 | Score: 1.78 | Recorde: 27.51 | Epsilon: 0.01 | Média Score (100): 5.00 | Passos no episódio: 350 | Tempo Decorrido: 5715.3s
+    batch_size=64,                                   27631- Episódio 27631/30000 | Score: 5.75 | Recorde: 33.24 | Epsilon: 0.01 | Média Score (100): 12.70 | Passos no episódio: 157 | Tempo Decorrido: 7197.2s
     learning_rate=0.0001, 
     gamma=0.99,
     buffer_capacity=10000, 
@@ -289,7 +289,7 @@ m7 - env,                                            2000- Episódio 2001/30000 
     target_update_freq=100, 
     max_train_time = 2*3600
 
-
+### NÃO FINALIZADO
 
 
 ############################################################################################## M8 #############################################################################################
@@ -354,3 +354,8 @@ def step(self, action):
 
 ############################################################################################### M9 ###############################################################################################
 m9 - 
+
+
+
+############################################################################################### M9 ###############################################################################################
+m10 - 
