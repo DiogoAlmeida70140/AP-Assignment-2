@@ -18,10 +18,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Treinamento --------------------------------------------------------
 def train(env, num_episodes=20000, max_steps_per_episode=1000,
-          epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9998,
+          epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9995,
           batch_size=64, learning_rate=0.0001, gamma=0.99,
           buffer_capacity=10000, num_warmup_steps=5000,
-          target_update_freq=100,inject_interval=30, inject_amount=1000):
+          target_update_freq=100, max_train_time = 2*3600):
 
     # Modelo principal (online network)
     model = CNN_QNet(input_shape=(1, env.height + 2 * env.border, env.width + 2 * env.border)).to(device)
@@ -51,12 +51,7 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
     print(f"A treinar no dispositivo: {device}...")
     start_time = time.time()
 
-    for episode in range(num_episodes):
-        
-        if (episode+1) % inject_interval == 0:
-            replay_buffer.populate(env, heuristic_policy, inject_amount)
-            #print(f">>> Injected {inject_amount} heuristic experiences at episode {episode}")
-            
+    for episode in range(num_episodes):     
         state_raw, _, _, _ = env.reset()
         preprocessed_state = preprocess(state_raw)
         score = 0
@@ -135,6 +130,10 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
         plot_scores.append(score)
         plot_mean_scores.append(mean_score)
 
+        if elapsed_time > max_train_time:
+            print("Tempo de treino limite excedido")
+            break
+
     total_training_time = time.time() - start_time
     print(f"\nTreino concluído em {total_training_time:.1f}s.")
     print(f"Pontuação média total: {np.mean(total_scores):.2f}")
@@ -168,7 +167,11 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
 
 # --- Funções de Jogo (Play) e Avaliação ---------------------------------
 
-def play(model, env, num_eval_episodes=10, top_k=10, scale=10):
+# permitir infinitos fps
+# função que avalia o modelo ao longo de 100 runs mas que tem um limite que se ao fim de 100runs nao tiver mudado o score, para de correr
+
+
+def play(model, env, num_eval_episodes=10, scale=10):
     pygame.init()
     board_h, board_w, _ = env.board_state().shape 
     screen_width = board_w * scale
@@ -222,48 +225,70 @@ def play(model, env, num_eval_episodes=10, top_k=10, scale=10):
     print(f"\nPontuação média de avaliação em {num_eval_episodes} episódios: {np.mean(eval_scores):.2f}")
     pygame.quit()
 
-
-def play_with_policy(env, policy, policy_name="Política", num_episodes=10, fps=10, scale=10):
-    pygame.init()
-    board_h, board_w, _ = env.board_state().shape
-    screen_width = board_w * scale
-    screen_height = board_h * scale
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption(f"Jogo da Cobra - {policy_name}")
-    clock = pygame.time.Clock()
-
-    scores = []
-    print(f"\nA executar a política: {policy_name}...")
-    for ep in range(num_episodes):
+def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top_k=10, fps=10, scale=10):
+        # Avaliar o modelo em múltiplos episódios
+    results = []  # Lista de (pontuação final, [frame0, frame1, ...])
+    for ep in range(1, num_eval_episodes + 1):
         state_raw, _, _, _ = env.reset()
-        done = False
-        total = 0
-        step_count = 0
+        preprocessed_state = preprocess(state_raw)
 
-        while not done:
+        done = False
+        total_reward = 0
+        steps = 0
+        idle_steps = 0  # Contador de passos sem progresso
+        while not done and idle_steps < idle_tolerance:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     pygame.quit()
                     return
 
-            action = policy(env)
-            next_state_raw, reward, done, info = env.step(action)
-            total += reward
-            step_count += 1
+            state_tensor = torch.tensor(preprocessed_state, dtype=torch.float32).unsqueeze(0).to(device)
+            with torch.no_grad():
+                prediction = model(state_tensor)
+            action = [-1, 0, 1][torch.argmax(prediction).item()]
 
-            disp = (next_state_raw * 255).astype(np.uint8)
-            if disp.shape[2] == 1:
-                disp = np.stack([disp.squeeze(), disp.squeeze(), disp.squeeze()], axis=-1)
+            next_state_raw, reward, done, info = env.step(action)
+            preprocessed_next_state = preprocess(next_state_raw)
+            total_reward += reward
+            preprocessed_state = preprocessed_next_state
+            idle_steps += 1 if reward == 0 else 0
+            steps += 1
+        
+        results.append((total_reward, raw_frames))
+        print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {steps}")
+    
+    # Selecionar os top_k melhores episódios
+    results.sort(key=lambda x: x[0], reverse=True)
+    top_results = results[:top_k]
+    print(f"\nTop {top_k} resultados (score, n_passos):")
+    for idx, (sc, frames) in enumerate(top_results, start=1):
+        print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames)-1}")
+    
+    # Mostrar os melhores jogos em Pygame
+    pygame.init()
+    window_size = ((env.width + 2 * env.border) * scale, (env.height + 2 * env.border) * scale)
+    screen = pygame.display.set_mode(window_size)
+    pygame.display.set_caption("Top Jogadas - Snake DQN")
+    clock = pygame.time.Clock()
+    
+    for rank, (score_final, raw_frames) in enumerate(top_results, start=1):
+        print(f"\nReproduzindo partida #{rank} com Score={score_final:.2f} em {fps} FPS...")
+        for raw in raw_frames:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return
             
-            surf = pygame.surfarray.make_surface(np.transpose(disp, (1, 0, 2)))
-            surf = pygame.transform.scale(surf, (screen_width, screen_height))
+            disp = (raw * 255).astype(np.uint8)
+            surf = pygame.surfarray.make_surface(disp)
+            surf = pygame.transform.scale(surf, window_size)
             screen.blit(surf, (0, 0))
             pygame.display.flip()
             clock.tick(fps)
         
-        scores.append(total)
-        print(f"{policy_name} Ep {ep+1}/{num_episodes} | Pontuação: {total:.2f}, Passos: {step_count}")
-
-    print(f"Pontuação média para {policy_name} em {num_episodes} episódios: {np.mean(scores):.2f}")
-    pygame.quit()
-
+        # Pausa de 1 segundo entre partidas
+        time.sleep(1)
+    
+    print("Fim da reprodução das melhores partidas.")
+    pygame.quit()    # Avaliar o modelo em múltiplos episódios
+    return top_results

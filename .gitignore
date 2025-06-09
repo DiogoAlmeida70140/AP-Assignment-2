@@ -3,7 +3,6 @@ virtual_ap/
 venv/
 
 #models and images folders
-**/model/
 **/images/
 
 # Cache

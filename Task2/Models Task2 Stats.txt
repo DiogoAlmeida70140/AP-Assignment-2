@@ -93,8 +93,8 @@ m4 - env,                                                                       
     num_episodes=30000,                                                             5000- Episódio 5001/30000 | Score: -1.67 | Recorde: 3.88 | Epsilon: 0.37 | Média Score (100): -0.66 | Passos no episódio: 14 | Tempo Decorrido: 1127.8s
     max_steps_per_episode=1000,                                                     10000- Episódio 10001/30000 | Score: 1.93 | Recorde: 5.40 | Epsilon: 0.14 | Média Score (100): -0.31 | Passos no episódio: 59 | Tempo Decorrido: 3210.5s
     epsilon_start=1.0,                                                              15000- Episódio 15001/30000 | Score: -0.75 | Recorde: 10.70 | Epsilon: 0.05 | Média Score (100): 1.46 | Passos no episódio: 31 | Tempo Decorrido: 5841.0s
-    epsilon_end=0.005,                                                              20000-
-    epsilon_decay=0.9998,                                                           25000-
+    epsilon_end=0.005,                                                              20000- Episódio 20001/30000 | Score: 1.36 | Recorde: 24.93 | Epsilon: 0.02 | Média Score (100): 2.17 | Passos no episódio: 12 | Tempo Decorrido: 12856.6s
+    epsilon_decay=0.9998,                                                           25000- 
     batch_size=64,                                                                  30000-
     learning_rate=0.0001, 
     gamma=0.99,
@@ -142,6 +142,8 @@ def step(self, action):
             self.grass[self.grass > self.max_grass] = self.max_grass
 
         return self.board_state(), reward, self.done, {'score': self.score}
+
+## NÃO TERMINADO DEVIDO A COMPARAÇÃO COM OUTROS 
 
 ############################################################################################### M5 ###############################################################################################
 
@@ -200,19 +202,155 @@ def step(self, action):
 
         return self.board_state(), reward, self.done, {'score': self.score}
 
+
 ##############################################################################################################################################################################################
 ##############################################################################################################################################################################################
 ##############################################################################################################################################################################################
 ######################################################################################## USAR INJECTED #######################################################################################
 
 ############################################################################################### M6 ###############################################################################################
-m6 - 
+m6 - env, 
+    num_episodes=20000,                                     2000-Episódio 2001/20000 | Score: 0.07 | Recorde: 2.89 | Epsilon: 0.67 | Média Score (100): -0.79 | Passos no episódio: 27 | Tempo Decorrido: 75.6s
+    max_steps_per_episode=1000,                             5000- Episódio 5001/20000 | Score: -0.83 | Recorde: 2.89 | Epsilon: 0.37 | Média Score (100): -0.94 | Passos no episódio: 8 | Tempo Decorrido: 218.4s
+    epsilon_start=1.0,                                      10000- Episódio 10001/20000 | Score: -0.93 | Recorde: 2.89 | Epsilon: 0.14 | Média Score (100): -0.92 | Passos no episódio: 6 | Tempo Decorrido: 473.6s
+    epsilon_end=0.005,                                      15000- Episódio 15001/20000 | Score: -1.44 | Recorde: 2.89 | Epsilon: 0.05 | Média Score (100): -0.97 | Passos no episódio: 9 | Tempo Decorrido: 703.4s
+    epsilon_decay=0.9998,                                   20000- Episódio 19991/20000 | Score: -0.64 | Recorde: 2.94 | Epsilon: 0.02 | Média Score (100): -0.96 | Passos no episódio: 9 | Tempo Decorrido: 902.1s
+    batch_size=64, 
+    learning_rate=0.0001, 
+    gamma=0.99,
+    buffer_capacity=10000, 
+    num_warmup_steps=5000,
+    target_update_freq=100,
+    inject_interval=30, 
+    inject_amount=1000
 
-############################################################################################### M7 ###############################################################################################
-m7 -
+self, width, height, food_amount=2,border = 0, grass_growth = 0,max_grass = 0
 
-############################################################################################### M8 ###############################################################################################
-m8 -
+def step(self, action):        
+        """
+        move snake/game one step 
+        action can be -1 (turn left), 0 (continue), 1 (turn rignt)
+        """
+        direction = int(action)
+        assert -1 <= direction <= 1
+        self.direction += direction
+        if self.direction < 0:
+            self.direction = 3
+        elif self.direction > 3:
+            self.direction = 0
+        self.grow_snake(self.direction)  # two steps: grow+remove last
+        if self.snake[0] in self.apples:
+            self.apples.remove(self.snake[0])
+            reward = 1
+            self.create_apples()  # new apple
+        else:
+            self.snake.pop()
+            self.check_collisions()
+            if self.done:
+                reward = -1
+            else:
+                reward = -0.005
+
+        if reward != -1:
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            reward -= (manhattan - self.last_manhattan) * 0.1
+            self.last_manhattan = manhattan
+
+            x, y = self.snake[0]
+            reward += self.grass[x, y]
+            self.grass[x, y] = 0
+            self.score += reward
+            self.grass += self.grass_growth
+            self.grass[self.grass > self.max_grass] = self.max_grass
+
+        return self.board_state(), reward, self.done, {'score': self.score}
+
+Conclusão não aprendeu nada obtendo scores completamente horriveis pois a cobra estava somente a ir em frente
+
+##############################################################################################################################################################################################
+##############################################################################################################################################################################################
+##############################################################################################################################################################################################
+##################################################################################### TESTAR VÁRIAS MAÇÃS ####################################################################################
+############################################################################################# M7 #############################################################################################
+Changed to insert the apples having in count the episodes. Starts with 5 and from 10000 to 10000 episodes decrease 1 until reach the minimum of 1
+m7 - env,                                            2000- Episódio 2001/30000 | Score: -0.89 | Recorde: 4.00 | Epsilon: 0.67 | Média Score (100): -0.57 | Passos no episódio: 19 | Tempo Decorrido: 46.2s
+    num_episodes=30000,                              5000- Episódio 5001/30000 | Score: 1.34 | Recorde: 4.40 | Epsilon: 0.37 | Média Score (100): -0.37 | Passos no episódio: 34 | Tempo Decorrido: 173.5s
+    max_steps_per_episode=1000,                      10000- Episódio 10001/30000 | Score: 3.51 | Recorde: 8.30 | Epsilon: 0.14 | Média Score (100): 0.56 | Passos no episódio: 185 | Tempo Decorrido: 641.2s
+    epsilon_start=1.0,                               15000- Episódio 15001/30000 | Score: 6.58 | Recorde: 11.98 | Epsilon: 0.05 | Média Score (100): 1.33 | Passos no episódio: 132 | Tempo Decorrido: 1585.4s
+    epsilon_end=0.005,                               20000- Episódio 20001/30000 | Score: 2.18 | Recorde: 18.45 | Epsilon: 0.02 | Média Score (100): 4.93 | Passos no episódio: 49 | Tempo Decorrido: 3312.3s
+    epsilon_decay=0.9998,                            25000-
+    batch_size=64,                                   30000-
+    learning_rate=0.0001, 
+    gamma=0.99,
+    buffer_capacity=10000, 
+    num_warmup_steps=5000,
+    target_update_freq=100, 
+    max_train_time = 2*3600
+
+
+
+
+############################################################################################## M8 #############################################################################################
+Baixar mais rapidamente o decay de forma a não dar tantas coisas aleatorias mais à frente no treino
+
+m8 - env, 
+    num_episodes=20000,                                 2000- Episódio 2001/20000 | Score: -0.90 | Recorde: 2.81 | Epsilon: 0.37 | Média Score (100): -0.94 | Passos no episódio: 20 | Tempo Decorrido: 92.2s
+    max_steps_per_episode=1000,                         5000- Episódio 5001/20000 | Score: -1.36 | Recorde: 4.30 | Epsilon: 0.08 | Média Score (100): -0.51 | Passos no episódio: 73 | Tempo Decorrido: 480.9s
+    epsilon_start=1.0,                                  10000-Episódio 10001/20000 | Score: 5.46 | Recorde: 11.10 | Epsilon: 0.01 | Média Score (100): 1.60 | Passos no episódio: 558 | Tempo Decorrido: 2384.0s
+    epsilon_end=0.005,                                  15000-
+    epsilon_decay=0.9995,                               20000-
+    batch_size=64, 
+    learning_rate=0.0001, 
+    gamma=0.99,
+    buffer_capacity=10000, 
+    num_warmup_steps=5000,
+    target_update_freq=100
+
+self, width, height, food_amount=2,border = 0, grass_growth = 0,max_grass = 0
+
+def step(self, action):        
+        """
+        move snake/game one step 
+        action can be -1 (turn left), 0 (continue), 1 (turn rignt)
+        """
+        direction = int(action)
+        assert -1 <= direction <= 1
+        self.direction += direction
+        if self.direction < 0:
+            self.direction = 3
+        elif self.direction > 3:
+            self.direction = 0
+        self.grow_snake(self.direction)  # two steps: grow+remove last
+        if self.snake[0] in self.apples:
+            self.apples.remove(self.snake[0])
+            reward = 1
+            self.create_apples()  # new apple
+        else:
+            self.snake.pop()
+            self.check_collisions()
+            if self.done:
+                reward = -1
+            else:
+                reward = -0.005
+
+        if reward != -1:
+            hx, hy = self.snake[0]
+            ax, ay = self.apples[0]
+            manhattan = abs(hx - ax) + abs(hy - ay)
+            reward -= (manhattan - self.last_manhattan) * 0.1
+            self.last_manhattan = manhattan
+
+            x, y = self.snake[0]
+            reward += self.grass[x, y]
+            self.grass[x, y] = 0
+            self.score += reward
+            self.grass += self.grass_growth
+            self.grass[self.grass > self.max_grass] = self.max_grass
+
+        return self.board_state(), reward, self.done, {'score': self.score}
+
 
 ############################################################################################### M9 ###############################################################################################
 m9 - 

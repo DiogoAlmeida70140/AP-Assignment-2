@@ -8,8 +8,8 @@ class SnakeGame:
     " Implements the snake game core"
 
     def __init__(self, width, height, food_amount=2,
-                 border = 0, grass_growth = 0.01,
-                 max_grass = 0.5):
+                 border = 0, grass_growth = 0,
+                 max_grass = 0):
         "Initialize board"
         self.width = width
         self.height = height

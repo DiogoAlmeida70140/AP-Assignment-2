@@ -44,7 +44,7 @@ if __name__ == '__main__':
     border = 1
     env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0)
 
-    model = get_model(env, force_train=False, file_name='m6.pth')
+    model = get_model(env, force_train=False, file_name='m8.pth')
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # model.eval()
 
     # Mostra o modelo com a heuristica
-    #play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
+    # play_with_heuristic(env, scale=10, fps=30, num_episodes=5)
     # # # 3) Avalia e mostra as top 3 partidas entre 5000
     #evaluate_and_show_best(model, env, num_eval_episodes=10, top_k=3, scale=10, slow_fps=5)
     play(model, env, num_eval_episodes=100, top_k=10)
