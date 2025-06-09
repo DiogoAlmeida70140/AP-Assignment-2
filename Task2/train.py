@@ -17,10 +17,10 @@ from replay_buffer import ReplayBuffer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Treinamento --------------------------------------------------------
-def train(env, num_episodes=20000, max_steps_per_episode=1000,
+def train(env, file_name, num_episodes=30000, max_steps_per_episode=1000,
           epsilon_start=1.0, epsilon_end=0.005, epsilon_decay=0.9995,
-          batch_size=64, learning_rate=0.0001, gamma=0.99,
-          buffer_capacity=10000, num_warmup_steps=5000,
+          batch_size=64, learning_rate=0.00015, gamma=0.99,
+          buffer_capacity=10000, num_warmup_steps=0,
           target_update_freq=100, max_train_time = 2*3600):
 
     # Modelo principal (online network)
@@ -60,7 +60,6 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
         steps_in_episode = 0
         done = False
         episode_losses = []
-        
 
         while not done and steps_in_episode < max_steps_per_episode:
             # Seleciona a ação (epsilon-greedy)
@@ -135,13 +134,13 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
         else:
             losses.append(0)
 
+        elapsed_time = time.time() - start_time
         if (episode % 10 == 0):
             print(f'Episódio {episode+1}/{num_episodes} | Score: {score:.2f} | Recorde: {record:.2f} | Epsilon: {epsilon:.2f} | Média Score (100): {mean_score:.2f} | Passos no episódio: {steps_in_episode} | Tempo Decorrido: {elapsed_time:.1f}s')
         
         plot_scores.append(score)
         plot_mean_scores.append(mean_score)
 
-        elapsed_time = time.time() - start_time
         if elapsed_time > max_train_time:
             print("Tempo de treino limite excedido")
             break
@@ -150,14 +149,14 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
     print(f"\nTreino concluído em {total_training_time:.1f}s.")
     print(f"Pontuação média total: {np.mean(total_scores):.2f}")
 
-    save_metrics(metrics, losses)
-    show_metrics(metrics, losses)
+    save_metrics(metrics, losses, file_name)
+    show_metrics(metrics, losses, file_name)
     
     return model
 
-def save_metrics(metrics, losses):
+def save_metrics(metrics, losses, file_name):
     # Salvando métricas + losses em CSV
-    with open('./Task1/training_metrics.csv', 'w', newline='') as f:
+    with open(f'./Task2/{file_name}_train_metrics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         # Adiciona coluna usada_heuristic
         writer.writerow(['episode', 'score', 'epsilon', 'avg_loss', 'used_heuristic'])
@@ -171,7 +170,7 @@ def save_metrics(metrics, losses):
             writer.writerow([metrics[i][0], metrics[i][1], metrics[i][2], losses[i], used])
     return
 
-def show_metrics(metrics, losses):
+def show_metrics(metrics, losses, file_name):
     # Plot charts (score, epsilon, loss)
     epis = [m[0] for m in metrics]
     scores = [m[1] for m in metrics]
@@ -183,7 +182,7 @@ def show_metrics(metrics, losses):
     plt.ylabel('Score')
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./Task1/images/treino_score.png')
+    plt.savefig(f'./Task2/images/{file_name}_train_score.png')
     plt.close()
 
     plt.figure(figsize=(8,4))
@@ -192,7 +191,7 @@ def show_metrics(metrics, losses):
     plt.ylabel('Epsilon')
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./Task1/images/treino_epsilon.png')
+    plt.savefig(f'./Task2/images/{file_name}_train_epsilon.png')
     plt.close()
 
     plt.figure(figsize=(8,4))
@@ -201,7 +200,7 @@ def show_metrics(metrics, losses):
     plt.ylabel('Loss')
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./Task1/images/treino_loss.png')
+    plt.savefig(f'./Task2/images/{file_name}_train_loss.png')
     plt.close()
     return
 

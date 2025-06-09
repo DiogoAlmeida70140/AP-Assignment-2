@@ -2,8 +2,6 @@
 virtual_ap/
 venv/
 
-#models and images folders
-**/images/
 
 # Cache
 __pycache__/

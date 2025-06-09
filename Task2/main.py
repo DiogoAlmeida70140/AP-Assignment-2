@@ -24,7 +24,7 @@ def get_model(env, force_train=False, file_name=''):
         except:
             print("Erro ao dar load do modelo, iniciando treino...")
     
-    model = train(env)
+    model = train(env, file_name)
     model.save(file_name)
     print("Modelo salvo em:" + file_name)
         
@@ -42,9 +42,9 @@ if __name__ == '__main__':
         
     board_size = (14, 14)
     border = 1
-    env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0)
+    env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0, food_amount=1)
 
-    model = get_model(env, force_train=False, file_name='m8.pth')
+    model = get_model(env, force_train=False, file_name='m9.pth')
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 
