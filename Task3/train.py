@@ -194,7 +194,7 @@ def show_metrics(metrics, losses, file_name):
 
 def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top_k=10, fps=10, scale=10):
     """
-    Evaluate the trained model and display top episodes via Pygame.
+    Evaluate the model and display top episodes with Pygame.
     """
     # Evaluate the model across multiple episodes
     results = []  # List of (final score, [frame0, frame1, ...])
@@ -204,6 +204,7 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
         raw_frames = [state_raw.copy()]
         done = False
         total_reward = 0
+        apple_count = 0
         steps = 0
         idle_steps = 0  # Step counter with no progress
         while not done and idle_steps < idle_tolerance:
@@ -217,18 +218,25 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
             preprocessed_next_state = preprocess(next_state_raw)
             total_reward += reward
             preprocessed_state = preprocessed_next_state
-            idle_steps += 1 if reward == 0 else 0
+            if reward < 0.2:
+                idle_steps += 1
+            else:
+                idle_steps = 0
+                apple_count += 1
             steps += 1
 
-        results.append((total_reward, raw_frames))
-        print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {steps}")
+        results.append((total_reward, raw_frames, apple_count))
+        print(f"[Eval] Ep {ep}/{num_eval_episodes} | Score: {total_reward:.2f} | Steps: {steps} | Apples: {apple_count}")
 
     # Select top_k best episodes
     results.sort(key=lambda x: x[0], reverse=True)
     top_results = results[:top_k]
     print(f"\nTop {top_k} resultados (score, n_passos):")
-    for idx, (sc, frames) in enumerate(top_results, start=1):
-        print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames) - 1}")
+    for idx, (sc, frames, apples) in enumerate(top_results, start=1):
+        print(f"  #{idx}: Score={sc:.2f}, Passos={len(frames) - 1}, apples={apples}")
+
+    print("Top average score:", np.mean([score for score, _, _ in top_results]))
+    print("Top average apples:", np.mean([apples for _, _, apples in top_results]))
 
     # Show the best Pygame games
     pygame.init()
@@ -237,7 +245,7 @@ def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top
     pygame.display.set_caption("Top Jogadas - Snake DQN")
     clock = pygame.time.Clock()
 
-    for rank, (score_final, raw_frames) in enumerate(top_results, start=1):
+    for rank, (score_final, raw_frames, apples) in enumerate(top_results, start=1):
         print(f"\nReproduzindo partida #{rank} com Score={score_final:.2f} em {fps} FPS...")
         for raw in raw_frames:
             for event in pygame.event.get():
