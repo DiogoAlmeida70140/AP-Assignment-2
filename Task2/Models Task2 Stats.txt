@@ -299,7 +299,7 @@ m8 - env,
     num_episodes=20000,                                 2000- Episódio 2001/20000 | Score: -0.90 | Recorde: 2.81 | Epsilon: 0.37 | Média Score (100): -0.94 | Passos no episódio: 20 | Tempo Decorrido: 92.2s
     max_steps_per_episode=1000,                         5000- Episódio 5001/20000 | Score: -1.36 | Recorde: 4.30 | Epsilon: 0.08 | Média Score (100): -0.51 | Passos no episódio: 73 | Tempo Decorrido: 480.9s
     epsilon_start=1.0,                                  10000-Episódio 10001/20000 | Score: 5.46 | Recorde: 11.10 | Epsilon: 0.01 | Média Score (100): 1.60 | Passos no episódio: 558 | Tempo Decorrido: 2384.0s
-    epsilon_end=0.005,                                  15000-
+    epsilon_end=0.005,                                  15000- Episódio 15001/20000 | Score: 15.39 | Recorde: 26.97 | Epsilon: 0.01 | Média Score (100): 9.53 | Passos no episódio: 281 | Tempo Decorrido: 5838.3s
     epsilon_decay=0.9995,                               20000-
     batch_size=64, 
     learning_rate=0.0001, 

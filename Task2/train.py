@@ -44,6 +44,8 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
     plot_scores = []
     plot_mean_scores = []
     record = 0
+    metrics = []
+    losses = []
     
     # Variável para contar os passos globais e atualizar a target network
     global_step_counter = 0 
@@ -57,6 +59,8 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
         score = 0
         steps_in_episode = 0
         done = False
+        episode_losses = []
+        
 
         while not done and steps_in_episode < max_steps_per_episode:
             # Seleciona a ação (epsilon-greedy)
@@ -107,6 +111,7 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
 
                 # Chamar o train_step com os Q_current_action e q_targets
                 loss = trainer.train_step(q_current_action, q_targets)
+                episode_losses.append(loss)
             
             # Atualiza a Target Network a cada 'target_update_freq' passos globais
             if global_step_counter % target_update_freq == 0:
@@ -123,13 +128,20 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
             record = score
             model.save("best_model.pth")
 
-        elapsed_time = time.time() - start_time
+        metrics.append((episode, score, epsilon))
+        if episode_losses:
+            avg_loss = sum(episode_losses) / len(episode_losses)
+            losses.append(avg_loss)
+        else:
+            losses.append(0)
+
         if (episode % 10 == 0):
             print(f'Episódio {episode+1}/{num_episodes} | Score: {score:.2f} | Recorde: {record:.2f} | Epsilon: {epsilon:.2f} | Média Score (100): {mean_score:.2f} | Passos no episódio: {steps_in_episode} | Tempo Decorrido: {elapsed_time:.1f}s')
         
         plot_scores.append(score)
         plot_mean_scores.append(mean_score)
 
+        elapsed_time = time.time() - start_time
         if elapsed_time > max_train_time:
             print("Tempo de treino limite excedido")
             break
@@ -138,33 +150,60 @@ def train(env, num_episodes=20000, max_steps_per_episode=1000,
     print(f"\nTreino concluído em {total_training_time:.1f}s.")
     print(f"Pontuação média total: {np.mean(total_scores):.2f}")
 
-    # Plotar resultados
-    os.makedirs('./Task1/images', exist_ok=True)
+    save_metrics(metrics, losses)
+    show_metrics(metrics, losses)
+    
+    return model
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(plot_scores, label='Score por Episódio')
-    plt.plot(plot_mean_scores, label='Média de Scores (últimos 100 episódios)')
-    plt.title('Treinamento da DQN com Experience Replay e Target Network')
+def save_metrics(metrics, losses):
+    # Salvando métricas + losses em CSV
+    with open('./Task1/training_metrics.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        # Adiciona coluna usada_heuristic
+        writer.writerow(['episode', 'score', 'epsilon', 'avg_loss', 'used_heuristic'])
+        for i in range(len(metrics)):
+            # metrics[i] = (ep, total_reward, epsilon)
+            # losses[i] = avg_loss
+            # Precisamos saber se, naquele episódio, usamos heurística. 
+            # Uma forma simples: se o último episódio usou heurística ao menos uma vez → True. 
+            # Para simplificar: considere que “usou heurística” se ep<=200.
+            used = (metrics[i][0] <= 200)
+            writer.writerow([metrics[i][0], metrics[i][1], metrics[i][2], losses[i], used])
+    return
+
+def show_metrics(metrics, losses):
+    # Plot charts (score, epsilon, loss)
+    epis = [m[0] for m in metrics]
+    scores = [m[1] for m in metrics]
+    epsilons = [m[2] for m in metrics]
+
+    plt.figure(figsize=(8,4))
+    plt.plot(epis, scores, label='Score por episódio')
     plt.xlabel('Episódio')
     plt.ylabel('Score')
     plt.legend()
-    plt.grid(True)
-    plt.savefig('./Task1/images/treino_score_dqn_enhanced.png')
+    plt.tight_layout()
+    plt.savefig('./Task1/images/treino_score.png')
     plt.close()
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(len(plot_scores)), [epsilon_start * (epsilon_decay ** i) for i in range(len(plot_scores))], label='Epsilon')
-    plt.title('Decaimento do Epsilon')
+    plt.figure(figsize=(8,4))
+    plt.plot(epis, epsilons, label='Epsilon por episódio')
     plt.xlabel('Episódio')
     plt.ylabel('Epsilon')
     plt.legend()
-    plt.grid(True)
-    plt.savefig('./Task1/images/treino_epsilon_dqn_enhanced.png')
+    plt.tight_layout()
+    plt.savefig('./Task1/images/treino_epsilon.png')
     plt.close()
 
-
-    return model
-
+    plt.figure(figsize=(8,4))
+    plt.plot(epis, losses, label='Loss média por episódio')
+    plt.xlabel('Episódio')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('./Task1/images/treino_loss.png')
+    plt.close()
+    return
 
 def evaluate_and_show(env, model, num_eval_episodes=100, idle_tolerance=100, top_k=10, fps=10, scale=10):
     # Avaliar o modelo em múltiplos episódios
