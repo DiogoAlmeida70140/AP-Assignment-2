@@ -44,7 +44,7 @@ if __name__ == '__main__':
     border = 1
     env = SnakeGame(*board_size, border=border,grass_growth=0,max_grass=0, food_amount=1)
 
-    model = get_model(env, force_train=True, file_name='Model2.pth')
+    model = get_model(env, force_train=False, file_name='Model3.pth')
     
     # evaluate_heuristic_baseline(env, num_episodes=100)
 

@@ -5,7 +5,7 @@ import torch.optim as optim
 import os
 
 class CNN_QNet(nn.Module):
-    model_folder_path = './Task2/model'
+    model_folder_path = './Task3/model'
 
     def __init__(self, input_shape=(1, 32, 32), num_actions=3):
         """
